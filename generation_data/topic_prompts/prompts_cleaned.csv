@@ -1,0 +1,171 @@
+Level,Arabic Text,Translated Text,Topic_ID,prompt_id
+Beginner,يومك المفضل,Describe your favorite day,1,1
+Beginner,طعامك المفضل,What is your favorite food and why?,1,2
+Beginner,هوايتك المفضلة؟,What is your favorite hobby?,2,3
+Beginner,رحلة قمت بها.,Talk about a trip you took.,1,4
+Beginner,يوم في المدرسة.,Talk about a day at school.,3,5
+Beginner,نشاط تحبه في عطلة نهاية الأسبوع.,Talk about a weekend activity you love.,2,6
+Beginner,حدث تاريخي مهم في بلدك؟,What is an important historical event in your country? Why is it important?,4,7
+Beginner,تقليد ثقافي في بلدك.,Talk about a cultural tradition in your country. What do you know about it?,4,8
+Beginner,الانتخابات في بلدك؟ هل تعرف من ينتخب؟,What is the importance of elections in your country? Do you know who votes?,5,9
+Beginner,كيف يؤثر الحكومة على حياتك اليومية؟ هل لديك مثال؟,How does the government affect your daily life? Do you have an example?,5,10
+Beginner,قضية اجتماعية مهمة في بلدك؟ لماذا هي مهمة؟,What is an important social issue in your country? Why is it important?,6,11
+Beginner,أن نساعد الآخرين في المجتمع؟ هل لديك أفكار؟,How can we help others in the community? Do you have any ideas?,6,12
+Beginner,موضوعك المفضل في المدرسة؟ ولماذا تحبه؟,What is your favorite subject in school? Why do you like it?,7,13
+Beginner,هل تفضل الدروس النظرية ام التطبيقات العملية,"Which do you prefer, the theoretical lesson or the empirical one? Why?",7,14
+Beginner,طريقة التعليم في بلدك,Do you like the way education is done in your country and why?,7,15
+Beginner,رياضتك المفضلة؟ لماذا تحبها؟,What is your favorite sport? Why do you like it?,8,16
+Beginner,كيف تحافظ على صحتك؟ هل تمارس الرياضة؟,How do you stay healthy? Do you exercise?,8,17
+Beginner,شخص تعتبره قدوة لك.,Talk about a role model.,1,18
+Beginner,يومك الأول في المدرسة.,Talk about your first day at school.,3,19
+Beginner,شيء الذي تود تغييره في العالم؟,What is the one thing you would change in the world?,9,20
+Beginner,أفضل صديق لك.,Talk about your best friend.,10,21
+Beginner,وصف تجربة طفولة لا تُنسى.,Describe an unforgettable childhood experience.,1,22
+Beginner,الوظيفة التي تحلم بها في المستقبل؟,"What is your dream job in the future, and why?",11,23
+Beginner,الطقس اليوم؟,What is the weather like today?,12,24
+Beginner,عيد عربي شعبي؟ وماذا يفعل الناس للاحتفال به؟,"What is a popular Arab holiday, and what do people do to celebrate it?",13,25
+Beginner,معلم عربي شهير؟ ولماذا هو مهم؟,"What is a famous Arab landmark, and why is it important?",14,26
+Beginner,تطبيقك المفضل على الهاتف المحمول؟ وكيف تستخدمه؟,"What is your favorite mobile app, and how do you use it?",15,27
+Beginner,هل تستخدم تطبيقات التواصل الاجتماعي؟ ماهو البرنامج المفضل وماذا تحب آن تشاهد؟,"Do you use social media apps? What is your favorite program, and what do you like to watch?",15,28
+Beginner,كيف تقضي وقتك مع عائلتك؟,How do you spend time with your family?,10,29
+Beginner,ماذا تفضل، الصيف أم الشتاء؟ ولماذا؟,"What do you prefer, summer or winter, and why?",12,30
+Beginner,كيف تحتفل بعيد ميلادك؟,How do you celebrate your birthday?,1,31
+Beginner,الرياضة التي تحب ممارستها؟ لماذا؟,What is your favorite sport? Why?,2,32
+Beginner,رحلتك المدرسية الأخيرة.,Talk about your last school trip.,3,33
+Beginner,ماذا تفعل قبل الذهاب إلى النوم؟,What do you do before going to bed?,16,34
+Beginner,كيف تستعد ليوم الدراسة؟,How do you prepare for your school day?,3,35
+Beginner,الشخص الذي يلهمك ولماذا؟,Who is the person who inspires you and why?,10,36
+Beginner,كيف تتخيل نفسك بعد عشر سنوات؟,How do you imagine yourself in ten years?,9,37
+Beginner,كيف تستعد للمدرسة كل يوم؟,How do you prepare for school every day?,17,38
+Beginner,ماذا تفعل إذا ربحت جائزة كبيرة؟,What do you do if you win a big prize?,9,39
+Beginner,ماذا تفعل عندما تشعر بالملل؟,What do you do when you are bored?,16,40
+Beginner,ماذا تعلمت من عائلتك؟,What have you learned from your family?,10,41
+Beginner,الشيء الذي يجعلك سعيدًا؟,What makes you happy?,1,42
+Beginner,تخيل أن لديك ساعة إضافية في اليوم. كيف ستقضيها؟,Imagine you have an extra hour in the day. How would you spend it?,9,43
+Beginner,إذا كان لديك مبلغ من المال، كيف ستنفقه؟,"If you had a sum of money, how would you spend it?",17,44
+Beginner,إذا استطعت أن تتعلم لغة جديدة، ما هي ولماذا؟,"If you could learn a new language, what would it be and why?",17,45
+Beginner,إذا استطعت السفر لأي مكان، أين ستذهب ولماذا؟,"If you could travel anywhere, where would you go and why?",17,46
+Beginner,إذا كنت بطلاً خارقاً، ماذا ستكون قوتك؟,"If you were a superhero, what would be your strength?",9,47
+Intermediate,تأثير التكنولوجيا على حياتنا اليومية.,Talk about the impact of technology on our daily lives.,15,48
+Intermediate,أهمية التعليم في حياتك؟,How important is education in your life?,7,49
+Intermediate,فوائد الرياضة للصحة.,Talk about the health benefits of sports.,8,50
+Intermediate,أهمية الصداقة في حياتك.,Talk about the importance of friendship in your life.,10,51
+Intermediate,أهمية الحفاظ على البيئة.,Talk about the importance of preserving the environment.,12,52
+Intermediate,تأثير وسائل التواصل الاجتماعي على المجتمع؟,What is the impact of social media on society?,15,53
+Intermediate,أهمية القراءة في حياتك.,Talk about the importance of reading in your life.,7,54
+Intermediate,فوائد السفر؟,What are the benefits of travel?,14,55
+Intermediate,أهمية العمل التطوعي.,Talk about the importance of volunteer work.,6,56
+Intermediate,دور الفن في المجتمع؟,What is the role of art in society?,6,57
+Intermediate,أهمية الصحة النفسية.,Talk about the importance of mental health.,8,58
+Intermediate,أهمية الوقت وكيفية إدارته.,Talk about the importance of time and how to manage it.,17,59
+Intermediate,أهمية الحفاظ على التراث.,Talk about the importance of preserving heritage.,13,60
+Intermediate,دور المرأة في المجتمع؟,What is the role of women in society?,6,61
+Intermediate,شرح مفهوم علمي تجده مثيرًا للاهتمام.,Explain a scientific concept that you find interesting.,7,62
+Intermediate, فوائد ومخاطر مواقع التواصل الاجتماعي؟,What are the benefits and risks of social media?,15,63
+Intermediate,كيف غيرت التكنولوجيا حياتنا؟,How has technology changed our lives?,15,64
+Intermediate,كتابك أو مؤلفك المفضل؟ ولماذا؟,What is your favorite book or author? And why?,7,65
+Intermediate,حدث تاريخي مهم في العالم العربي؟ ولماذا هو مهم؟,What is an important historical event in the Arab world? And why is it important?,4,66
+Intermediate,قارن بين ثقافتين عربيتين مختلفتين.,Compare two different Arab cultures.,4,67
+Intermediate,ناقش فوائد القراءة وأثرها على التفكير.,Discuss the benefits of reading and its impact on thinking.,7,68
+Intermediate,كيف تؤثر وسائل التواصل الاجتماعي على العلاقات الشخصية؟,How does social media affect personal relationships?,15,69
+Intermediate,كيف يمكن للشباب المساهمة في تطوير المجتمع؟,How can young people contribute to developing society?,6,70
+Intermediate,ناقش أهمية العلاقات الأسرية ودورها في حياة الفرد.,Discuss the importance of family relationships and their role in an individual’s life.,10,71
+Intermediate,أهمية اللغة العربية في الحفاظ على الهوية.,Talk about the importance of the Arabic language in preserving identity.,6,72
+Intermediate,أهمية السفر في توسعة مدارك الإنسان.,Talk about the importance of travel in expanding one’s horizons.,14,73
+Intermediate,التحديات التي تواجهها المرأة في المجتمع الحديث؟,What are the challenges that women face in modern society?,6,74
+Intermediate,كيف يمكننا تحقيق التوازن بين العمل والحياة الشخصية؟,How can we achieve a balance between work and personal life?,17,75
+Intermediate,كيف يمكننا التعامل مع التوتر في الحياة اليومية؟,How can we deal with stress in daily life?,17,76
+Intermediate,ناقش دور التكنولوجيا في تحسين الرعاية الصحية.,Discuss the role of technology in improving health care.,15,77
+Intermediate,أهمية الماء وكيف يمكننا الحفاظ عليه.,Talk about the importance of water and how we can conserve it.,12,78
+Intermediate,كيف يمكننا التعامل مع الضغوط النفسية؟,How can we deal with psychological stress?,8,79
+Intermediate,كيف يمكننا تعزيز المساواة بين الجنسين في مكان العمل؟,How can we promote gender equality in the workplace?,6,80
+Intermediate,تأثير التقاليد الثقافية على الحياة اليومية في بلدك. كيف تُشكل هذه التقاليد القيم والمعتقدات لدى الأفراد؟,Discuss the impact of cultural traditions on daily life in your country. How do these traditions shape the values and beliefs of individuals?,13,81
+Intermediate,بعض العادات والتقاليد التي تعتبرها مميزة في ثقافتك؟ كيف تختلف هذه العادات من جيل إلى جيل؟,What are some customs and traditions that you consider unique to your culture? How do these customs differ from one generation to another?,13,82
+Intermediate,كيف تبدو يومياتك في عطلة نهاية الأسبوع؟ ما الأنشطة التي تستمتع بها عادةً ولماذا؟,"What does your weekend routine look like? What activities do you usually enjoy, and why?",16,83
+Intermediate,تجربة يوم عادي في حياتك. ما هي الأمور التي تقوم بها من الصباح حتى المساء؟,Talk about an ordinary day in your life. What activities do you engage in from morning until evening?,16,84
+Intermediate,إذا كنت تستطيع أن تعيش في عالم خيالي، أي عالم ستختار ولماذا؟,"If you could live in a fantasy world, which one would you choose and why?",9,85
+Intermediate,تخيل أنك تمتلك قوى سحرية. كيف ستستخدم هذه القوى في حياتك اليومية؟,Imagine you have magical powers. How would you use these powers in your daily life?,9,86
+Intermediate,تجربة شخصية تفتخر بها. ماذا تعلمت من هذه التجربة؟,Talk about a personal experience you are proud of. What did you learn from this experience?,1,87
+Intermediate,هل لديك موقف صعب واجهته في حياتك؟ كيف تعاملت معه؟,Do you have a difficult situation you faced in your life? How did you handle it?,1,88
+Intermediate,أهمية المشاركة في الانتخابات في بلدك؟ هل تعتقد أن الشباب يجب أن يشاركوا أكثر؟,What is the importance of participating in elections in your country? Do you think young people should participate more?,5,89
+Intermediate,كيف تؤثر السياسات الحكومية على حياة المواطنين اليومية؟ قدم أمثلة على ذلك.,How do government policies affect the daily lives of citizens? Provide examples of this.,5,90
+Intermediate,كيف تبدو حياتك اليومية في المدرسة؟ ما هي الأنشطة التي تستمتع بها أكثر؟,What does your daily life at school look like? What activities do you enjoy the most?,3,91
+Intermediate,الشيء الذي تتعلمه في المدرسة ويهمك كثيرًا؟ لماذا تعتقد أنه مهم؟,What is something you learn in school that matters a lot to you? Why do you think it is important?,3,92
+Intermediate,كيف تتخيل حياتك في المستقبل؟ ما هي الأهداف التي ترغب في تحقيقها؟,How do you envision your life in the future? What goals do you want to achieve?,11,93
+Intermediate,المهن التي تفكر فيها لمستقبلك؟ لماذا تعتبرها خيارات جيدة بالنسبة لك؟,What professions are you considering for your future? Why do you think they are good options for you?,11,94
+Intermediate,هوايتك المفضلة وكيف بدأت في ممارستها؟ لماذا تحبها؟,What is your favorite hobby and how did you start practicing it? Why do you enjoy it?,2,95
+Intermediate,هل ترغب في تعلم هواية جديدة؟ ما هي ولماذا تهمك؟,Do you wish to learn a new hobby? What is it and why does it interest you?,2,96
+Intermediate,ناقش فوائد التعلم عبر الإنترنت.,Discuss the benefits of online learning.,15,97
+Intermediate,ناقش فوائد وأضرار الإنترنت.,Discuss the benefits and harms of the Internet.,15,98
+Intermediate,كيف يمكنك تحقيق النجاح في الحياة؟,How can you achieve success in life?,17,99
+Intermediate,كيف نطور نظام التعليم في العالم العربي؟,How can we develop the education system in the Arab world?,7,100
+Advanced,تأثير التكنولوجيا على سوق العمل.,Talk about the impact of technology on the labor market.,15,101
+Advanced,أهمية البحث العلمي في تطوير المجتمع؟,What is the importance of scientific research in developing society?,7,102
+Advanced,دور الحكومات في حماية البيئة.,Talk about the role of governments in protecting the environment.,12,103
+Advanced,تأثير العولمة على الثقافات المحلية,What is the impact of globalization on local cultures?,6,104
+Advanced,دور التعليم في مكافحة الفقر.,Talk about the role of education in combating poverty.,7,105
+Advanced,تأثير الإعلام على السياسة؟,What is the impact of the media on politics?,5,106
+Advanced,دور الشباب في التغيير الاجتماعي.,Talk about the role of youth in social change.,6,107
+Advanced,تأثير التكنولوجيا على الخصوصية؟,What is the impact of technology on privacy?,15,108
+Advanced,دور الفن في التعبير عن القضايا الاجتماعية.,Talk about the role of art in expressing social issues.,6,109
+Advanced,أهمية التعليم في بناء المجتمع.,Talk about the importance of education in building society.,7,110
+Advanced,التحديات التي تواجه الديمقراطية في العالم؟,What are the challenges facing democracy in the world?,5,111
+Advanced,دور الشباب في بناء المستقبل.,Talk about the role of youth in building the future.,6,112
+Advanced,تأثير التكنولوجيا على التعليم؟,What is the impact of technology on education?,15,113
+Advanced,ما رأيك في دور الحكومة في المجتمع؟,What do you think about the role of government in society?,5,114
+Advanced,ناقش تأثير الذكاء الاصطناعي على سوق العمل العالمي.,Discuss the impact of artificial intelligence on the global labor market.,15,115
+Advanced,التحديات التي يواجهها العالم العربي اليوم؟,What are the challenges facing the Arab world today?,5,116
+Advanced,أهمية التعليم الرقمي في عصرنا الحالي.,Talk about the importance of digital education in our current era.,7,117
+Advanced,الحلول الممكنة لمواجهة مشكلة البطالة في العالم العربي؟,What are the possible solutions to address the problem of unemployment in the Arab world?,6,118
+Advanced,كيف تؤثر الحروب والنزاعات على التطور العلمي والتكنولوجي؟,How do wars and conflicts affect scientific and technological development?,5,119
+Advanced,ناقش دور الأديان في تعزيز السلام العالمي.,Discuss the role of religions in promoting world peace.,5,120
+Advanced,كيف يمكننا تحسين نظام الرعاية الصحية في الدول النامية؟,How can we improve the health care system in developing countries?,8,121
+Advanced,كيف يمكن للعلوم الإنسانية أن تسهم في حل الأزمات العالمية؟,How can the humanities contribute to solving global crises?,7,122
+Advanced,أهمية الابتكار في الصناعة والتعليم.,Talk about the importance of innovation in industry and education.,7,123
+Advanced,أثر الإنترنت على الخصوصية وحقوق الإنسان؟,What is the impact of the Internet on privacy and human rights?,15,124
+Advanced,كيف يمكن للتعليم أن يسهم في مكافحة التطرف؟,How can education help combat extremism?,7,125
+Advanced,كيف يمكن للذكاء الاصطناعي أن يغير مستقبل العمل؟,How can artificial intelligence change the future of work?,15,126
+Advanced,أهمية الحرية الأكاديمية في الجامعات.,Talk about the importance of academic freedom in universities.,7,127
+Advanced,ناقش التحديات التي تواجه الصحافة الحرة في العصر الرقمي.,Discuss the challenges facing a free press in the digital age.,5,128
+Advanced,كيف يمكننا تقليل الفجوة بين الطبقات الاجتماعية؟,How can we bridge the gap between social classes?,6,129
+Advanced,دور العائلة في تطوير المجتمع,Talk about the role of Family in country development.,10,130
+Advanced,قل لي من تصاحب، أقل لك من أنت،  من واقع خبدرتك تأثير الصداقة في حياة الفرد,"Tell me who you hang out with, I'll tell you who you are. From your experience, talk about the impact of friendship on a person's life.",10,131
+Advanced,دولتين زرتهم من قارتين مختلفتين وقارن بينهم,Talk about two countries you have visited  from two different continents and compare them.,14,132
+Advanced,مناقشة تأثير تغير المناخ على العالم العربي.,Discussing the impact of climate change on the Arab world. ,12,133
+Advanced,ما الذي يمكن فعله لحماية البيئة؟,What can be done to protect the environment?,12,134
+Advanced,ناقش تأثير العولمة على الهوية الثقافية في العالم العربي. هل تعتقد أن العولمة لها تأثير سلبي أم إيجابي على التقاليد والعادات المحلية؟ قدم أمثلة لدعم رأيك,Discuss the impact of globalization on cultural identity in the Arab world. Do you think globalization has a negative or positive impact on local traditions and customs? Provide examples to support your opinion.,13,135
+Advanced,كيف يمكن للمجتمعات الحديثة الحفاظ على تقاليدها وثقافاتها الفريدة في مواجهة التقدم التكنولوجي والتغيرات الاجتماعية؟ ناقش التحديات والفرص المرتبطة بالحفاظ على التراث الثقافي.,How can modern societies preserve their unique traditions and cultures despite technological advances and social changes? Discuss the challenges and opportunities associated with preserving cultural heritage.,13,136
+Advanced,تحليل كيف يؤثر التقدم التكنولوجي على الروتين اليومي للأفراد. هل ترى أن هذه التأثيرات إيجابية أم سلبية، ولماذا؟,"Analyze how technological advancements impact individuals' daily routines. Do you see these effects as positive or negative, and why?",16,137
+Advanced,ناقش كيف تتأثر أنماط الحياة اليومية بالتغيرات الاجتماعية والاقتصادية في العصر الحديث. ما هي التحديات التي تواجه الأفراد في التكيف مع هذه التغيرات؟,Discuss how daily life patterns are affected by social and economic changes in the modern era. What challenges do individuals face in adapting to these changes?,16,138
+Advanced,ناقش كيف تتخيل مستقبلك الشخصي والمستقبل المهني. ما هي الأهداف التي تسعى لتحقيقها، وما الخطوات التي تنوي اتخاذها للوصول إليها؟,"Discuss how you envision your personal and professional future. What goals are you striving to achieve, and what steps do you plan to take to reach them?
+",11,139
+Advanced,كيف تؤثر التطورات التكنولوجية على مستقبل البشرية؟ هل ترى أن هذه التطورات ستعود بالفائدة أم الضرر على المجتمع؟,How do technological advancements affect the future of humanity? Do you see these advancements as beneficial or detrimental to society?,11,140
+Advanced,حدث تاريخي بارز أثر على ثقافتك المحلية. كيف أثر هذا الحدث على القيم والتقاليد في المجتمع؟,"Discuss a significant historical event that impacted your local culture. How did this event influence the values and traditions within the community?
+",4,141
+Advanced,كيف تعكس الفنون والآداب تاريخ وثقافة بلدك؟ اختر مثالاً معيناً وناقش تأثيره.,How do the arts and literature reflect the history and culture of your country? Choose a specific example and discuss its impact.,4,142
+Advanced,ناقش كيف يؤثر الهواية على صحتك النفسية والجسدية. كيف يمكن أن تكون الهوايات وسيلة للتعبير عن الذات؟,Discuss how hobbies impact your mental and physical health. How can hobbies serve as a means of self-expression?,2,143
+Advanced,هل هناك هواية جديدة ترغب في تجربتها؟ ناقش الأسباب التي تجعلك مهتمًا بها وكيف تعتقد أنها ستفيدك.,Is there a new hobby you wish to try? Discuss the reasons you are interested in it and how you believe it will benefit you.,2,144
+Advanced,إذا كان بإمكانك السفر عبر الزمن، إلى أي فترة تاريخية ستذهب ولماذا؟ كيف ستؤثر تلك التجربة على فهمك للحاضر؟,"If you could travel through time, which historical period would you choose and why? How would that experience affect your understanding of the present?",9,145
+Advanced,تخيل أنك تعيش في عالم خيالي. كيف ستبدو حياتك اليومية وما التحديات التي ستواجهها؟,"Imagine you live in a fantasy world. What would your daily life look like, and what challenges would you face?
+",9,146
+Advanced,ناقش استراتيجيات إدارة الوقت التي تتبعها لتحقيق التوازن بين العمل والحياة الشخصية. ما هي التحديات التي تواجهها في ذلك؟,Discuss the time management strategies you follow to achieve a balance between work and personal life. What challenges do you face in this regard?,17,147
+Advanced,كيف يمكن أن تؤثر إدارة الوقت الجيدة على الإنتاجية الشخصية؟ قدم أمثلة على كيفية تحسين وقتك.,How can good time management affect personal productivity? Provide examples of how you can improve your time usage.,17,148
+Advanced,"تجربة شخصية غيرت نظرتك للحياة. كيف أثرت هذه التجربة على قراراتك المستقبلية؟
+",Discuss a personal experience that changed your perspective on life. How did this experience influence your future decisions?,1,149
+Advanced,"هل لديك ذكريات مؤثرة من الطفولة تود مشاركتها؟ كيف شكلت تلك الذكريات هويتك الحالية؟
+",Do you have impactful childhood memories that you would like to share? How have those memories shaped your current identity?,1,150
+Advanced,ناقش كيف تؤثر تجربة المدرسة على تطوير المهارات الاجتماعية لدى الطلاب. ما هي الأنشطة المدرسية التي تعتقد أنها الأهم في هذا الصدد؟,Discuss how the school experience influences the development of social skills among students. What school activities do you believe are most important in this regard?,3,151
+Advanced,"كيف تعتقد أن التكنولوجيا قد غيرت من شكل التعليم المدرسي؟ هل ترى أن هذه التغييرات إيجابية أم سلبية؟
+",How do you think technology has changed the nature of school education? Do you see these changes as positive or negative?,3,152
+Beginner,كيف تؤثر وسائل التواصل الإجتماعي على الفرد و المجتمع؟,How do social media affect individuals and society?,18,153
+Intermediate,كيف تؤثر وسائل التواصل الإجتماعي على الفرد و المجتمع؟,How do social media affect individuals and society?,18,154
+Advanced,كيف تؤثر وسائل التواصل الإجتماعي على الفرد و المجتمع؟,How do social media affect individuals and society?,18,155
+Beginner,كيف نعزز ثقافة التسامج في المجتمع؟,How can the UAE promote a culture of tolerance in society?,19,156
+Intermediate,كيف نعزز ثقافة التسامج في المجتمع؟,How can the UAE promote a culture of tolerance in society?,19,157
+Advanced,كيف نعزز ثقافة التسامج في المجتمع؟,How can the UAE promote a culture of tolerance in society?,19,158
+Beginner,من وجهة نظرك ماهي أهم مظاهر التطور الحضاري في دولة الإمارات العربية المتحدة؟,What do you think are the most important developments in the UAE at the moment?,20,159
+Intermediate,من وجهة نظرك ماهي أهم مظاهر التطور الحضاري في دولة الإمارات العربية المتحدة؟,What do you think are the most important developments in the UAE at the moment?,20,160
+Advanced,من وجهة نظرك ماهي أهم مظاهر التطور الحضاري في دولة الإمارات العربية المتحدة؟,What do you think are the most important developments in the UAE at the moment?,20,161
+
+
+
