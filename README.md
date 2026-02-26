@@ -33,7 +33,7 @@ The ARWI dataset is already formatted as full essays and does not require mergin
 
 # Readability Alignment
 
-We predict the **BAREC readability level** for the processed essays.
+We predict the **BAREC (Taha-19) readability level** for the processed essays.
 
 ---
 
@@ -68,13 +68,18 @@ CSV file containing:
 CSV file with D3 tokenization
 
 **Output:**  
-CSV file with predicted BAREC readability levels
+CSV file with predicted BAREC (Taha-19) readability levels
 
 ---
 
-## 3. corelation
-We calculate the corelation between Taha-19 levels and CEFR
-    utils/barec_corelation.py
+## 3. Correlation Analysis
+
+We calculate the correlation between Taha-19 levels and CEFR levels.
+
+**Script:**  
+`utils/barec_correlation.py`
+
+---
 
 ## 4. Visualization
 
@@ -138,64 +143,107 @@ Each profile consists of:
 
 We filter features based on their trends across CEFR levels to retain progression-sensitive and discriminative features.
 
-1. Create profiles:
-    profile_creator.py
-    - input: feature summaries from zaebuc and arwi combined
-    - output:profiles of the selected features + visualization plots found in profiling_data/ZAEBUC+ARWI/6levels
+## 1. Profile Creation
 
-# vocabulary list construction:
-for every prompt we create a list of vocabs that are suitable for that level.
+**Script:**  
+`profile_creator.py`
 
-1. Generate vocabs list per prompt
-   - vocabulary_construction/generate_prompts_vocabs.py
+**Input:**  
+Feature summaries from ZAEBUC and ARWI combined
 
-2. map and filter the generated words to their corresponding SAMER level
-   - vocabulary_construction/gpt_tosamer.py
+**Output:**  
+- Profiles of selected features  
+- Visualization plots located in:  
+  `profiling_data/ZAEBUC+ARWI/6levels`
 
-3. for those with low vocabs count, use vocab relevance model to get more vocabs
-   - vocabulary_construction/vocab-relavance.py
+---
 
-4. merge both from 2 and 3 
-   - vocabulary_construction/merge_vocabs.py
+# Vocabulary List Construction
 
-# Generation:
-We prompt gpt-4o and ask it to generate essays of topics from the ARWI dataset. those topics are categorized into Begginer, Intermediate, and Advanced.
+For each prompt, we construct a vocabulary list suitable for the target level.
 
-prompts are set up with 3, 5 and 6 levels
- 
-3 levels:  Begginer ->A, Intermediate -> B, and Advanced -> C
-5 levels: Begginer ->A, Intermediate -> B1, B2 , Advanced -> C1, C2
-6 levels: Begginer -> A1, A2 , Intermediate -> B1, B2 , Advanced -> C1, C2
+## 1. Generate vocabulary list per prompt  
+`vocabulary_construction/generate_prompts_vocabs.py`
 
+## 2. Map and filter generated words to their corresponding SAMER level  
+`vocabulary_construction/gpt_tosamer.py`
 
-We use batch mode. 
+## 3. For prompts with low vocabulary count, use a vocabulary relevance model to expand the list  
+`vocabulary_construction/vocab_relevance.py`
 
-1. batch data 
-    Generation/batch_creation.py
-2. upload and run
-    Generation/upload_run.py
+## 4. Merge outputs from steps 2 and 3  
+`vocabulary_construction/merge_vocabs.py`
 
-We generate under 5 conditions:
-P1: No given level, given just the topic.
-The evaluation of this one is done on 3 levels.
+---
 
-P2: given topic and level
-The evaluation of this one is done on 6 levels.
+# Generation
 
-P3: given topic, level and profile specifications based on the level.
-The evaluation of this one is done on 6 levels.
+We prompt GPT-4o to generate essays using topics from the ARWI dataset.  
+The topics are categorized into:
 
-P4: given topic, level, and vocabs list.
-The evaluation of this one is done on 5 levels.
-Details on how the Vocabs list formulation below
+- Beginner
+- Intermediate
+- Advanced
 
-P5: given topic, level, profile specifications, and vocabs list.
-The evaluation of this one is done on 5 levels.
+Prompts are structured with different level granularities:
 
-After generation we extract the features just like we did in Feature Extraction section. 
-then we filter based on the chosen ones in the profile:
-    - utils/features_filter.py
+### 3 Levels
+- Beginner → A  
+- Intermediate → B  
+- Advanced → C  
 
-Then we evaluate against the profiles:
-    - utils/cosine_similarity.py
+### 5 Levels
+- Beginner → A  
+- Intermediate → B1, B2  
+- Advanced → C1, C2  
 
+### 6 Levels
+- Beginner → A1, A2  
+- Intermediate → B1, B2  
+- Advanced → C1, C2  
+
+We use batch mode for generation.
+
+## 1. Batch creation  
+`Generation/batch_creation.py`
+
+## 2. Upload and run  
+`Generation/upload_run.py`
+
+---
+
+# Generation Conditions
+
+We generate essays under five conditions:
+
+### P1
+Given topic only (no level specified).  
+Evaluation: 3 levels.
+
+### P2
+Given topic and level.  
+Evaluation: 6 levels.
+
+### P3
+Given topic, level, and profile specifications based on the level.  
+Evaluation: 6 levels.
+
+### P4
+Given topic, level, and vocabulary list.  
+Evaluation: 5 levels.
+
+### P5
+Given topic, level, profile specifications, and vocabulary list.  
+Evaluation: 5 levels.
+
+---
+
+# Post-Generation Processing
+
+After generation:
+
+1. We extract linguistic features (same pipeline as Feature Extraction section).
+2. We filter features based on the selected profile features:  
+   `utils/features_filter.py`
+3. We evaluate generated essays against CEFR profiles using cosine similarity:  
+   `utils/cosine_similarity.py`
