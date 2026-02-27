@@ -1,22 +1,56 @@
+"""Compute tree statistics (depth/breadth/branching) from CoNLL-X files.
+
+Input:
+  --src_dir   directory containing *.conllx files (with '# id = ...' sentence ids)
+  --out_dir   directory to write per-file Excel stats and all_files_stats.xlsx
+
+Example:
+  python feature_extraction/tree_stats.py \
+    --src_dir <src_dir> \
+    --out_dir <out_dir>
+"""
+
+from __future__ import annotations
+
+import argparse
+import os
 import sys
-import os
+from typing import List
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
-from conllx_df.src.conllx_df import ConllxDf
-from conllx_df.src.conll_utils import get_token_details, get_sentence_column_data, get_children_ids_of, get_parent_id, add_parent_details, add_direction, get_token_count
-import os
 import pandas as pd
 import tqdm
 
+# conllx_df is a local dependency cloned alongside this repo.
+# We add the repo root to sys.path so it can be imported regardless of
+# the working directory the script is called from.
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-src_dir = "/home/nour.rabih/arwi/readability_controlled_generation/generation/no_level/essays_parsed_Text_100"
-stats_dir = os.path.join(src_dir, "tree_stats")
-os.makedirs(stats_dir, exist_ok=True)
+from conllx_df.src.conllx_df import ConllxDf
+from conllx_df.src.conll_utils import get_children_ids_of, get_token_count
 
-def extract_sentence_ids(conll_file):
-    """Return the list of sentence IDs from '# id = ...' lines in correct order."""
-    sent_ids = []
+
+# ---------------------------------------------------------------------------
+# Constants
+# ---------------------------------------------------------------------------
+
+CONLLX_EXT          = ".conllx"
+
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def extract_sentence_ids(conll_file: str) -> List[str]:
+    """Extract ordered sentence IDs from '# id = ...' comment lines.
+
+    Args:
+        conll_file: Path to a CoNLL-X file.
+
+    Returns:
+        List of sentence ID strings in file order.
+    """
+    sent_ids: List[str] = []
     with open(conll_file, "r", encoding="utf-8") as f:
         for line in f:
             if line.startswith("# id ="):
@@ -24,114 +58,103 @@ def extract_sentence_ids(conll_file):
     return sent_ids
 
 
-def calculate_tree_stats(sent_df):
-    """
-    Calculate depth and branching factor statistics for a dependency tree.
-    
+def calculate_tree_stats(sent_df: pd.DataFrame) -> dict:
+    """Compute depth, breadth, and branching statistics for a dependency tree.
+
     Args:
-        sent_df: DataFrame containing sentence data
-        
+        sent_df: DataFrame for a single sentence from ConllxDf.
+
     Returns:
-        dict: Dictionary containing tree statistics
+        Dict with keys: depth, breadth, depth_normalized, breadth_normalized,
+        max_branching_factor, avg_branching_factor, min_branching_factor,
+        total_nodes.
     """
-    # Build the tree structure
     tree = [[0]]
     while True:
         new_level = []
         for parent_id in tree[-1]:
-            children_ids = get_children_ids_of(sent_df, parent_id)
-            new_level.extend(children_ids)
-        if len(new_level) == 0:
+            new_level.extend(get_children_ids_of(sent_df, parent_id))
+        if not new_level:
             break
         tree.append(new_level)
-    
-    # Calculate depth (excluding root level)
-    depth = len(tree) - 1
-    breadth = max([len(level) for level in tree])
-    
-    # Calculate branching factors for each level
+
+    depth    = len(tree) - 1
+    breadth  = max(len(level) for level in tree)
+
     branching_factors = []
     for level in tree[1:]:
-        level_branching = []
-        for parent_id in level:
-            children_count = len(get_children_ids_of(sent_df, parent_id))
-            if children_count > 0:  # Only count nodes that have children
-                level_branching.append(children_count)
-        if level_branching:
-            branching_factors.extend(level_branching)
-    
-    # Calculate statistics
+        for node_id in level:
+            c = len(get_children_ids_of(sent_df, node_id))
+            if c > 0:
+                branching_factors.append(c)
+
     total_nodes = get_token_count(sent_df)
-    stats = {
-        'depth': depth,
-        'breadth': breadth,
-        'depth_normalized': depth / total_nodes if total_nodes > 0 else 0,
-        'breadth_normalized': breadth / total_nodes if total_nodes > 0 else 0,
-        'max_branching_factor': max(branching_factors) if branching_factors else 0,
-        'avg_branching_factor': sum(branching_factors) / len(branching_factors) if branching_factors else 0,
-        'min_branching_factor': min(branching_factors) if branching_factors else 0,
-        'total_nodes': total_nodes,
-        'tree_structure': tree,  # Include all levels
-        'branching_factors': branching_factors
+
+    return {
+        "depth":                depth,
+        "breadth":              breadth,
+        "depth_normalized":     depth  / total_nodes if total_nodes > 0 else 0,
+        "breadth_normalized":   breadth / total_nodes if total_nodes > 0 else 0,
+        "max_branching_factor": max(branching_factors) if branching_factors else 0,
+        "avg_branching_factor": (
+            sum(branching_factors) / len(branching_factors)
+            if branching_factors else 0
+        ),
+        "min_branching_factor": min(branching_factors) if branching_factors else 0,
+        "total_nodes":          total_nodes,
     }
-    
-    return stats
-
-files = [f for f in os.listdir(src_dir) if f.endswith(".conllx")]
-files_stats = {
-    'file_name': [],
-    'total_sentences': [],
-    'total_nodes': [],
-    'avg_depth': [],
-    'avg_breadth': [],
-    'avg_depth_normalized': [],
-    'avg_breadth_normalized': [],
-    'avg_branching_factor': []
-}
 
 
-for file in tqdm.tqdm(files):
-    conll_file = os.path.join(src_dir, file)
-    sentence_ids = extract_sentence_ids(conll_file)
-    with open(conll_file, 'r', encoding='utf-8') as f:
-        data = f.read().split("\n")
-    sent_count = len([line for line in data if line.startswith("# id =")])
-    conll_df = ConllxDf(conll_file)
-    stats_df_dict = {
-        'sentence_id': [],
-        'depth': [],
-        'breadth': [],
-        'depth_normalized': [],
-        'breadth_normalized': [],
-        'max_branching_factor': [],
-        'avg_branching_factor': [],
-        'min_branching_factor': [],
-        'total_nodes': [],
-        'branching_factors': []
-    }
-    for i, sent_id in enumerate(sentence_ids):
-        sent_df = conll_df.get_df_by_id(i)
-        stats = calculate_tree_stats(sent_df)
-        stats_df_dict['sentence_id'].append(sent_id)
-        stats_df_dict['depth'].append(stats['depth'])
-        stats_df_dict['breadth'].append(stats['breadth'])
-        stats_df_dict['depth_normalized'].append(stats['depth_normalized'])
-        stats_df_dict['breadth_normalized'].append(stats['breadth_normalized'])
-        stats_df_dict['max_branching_factor'].append(stats['max_branching_factor'])
-        stats_df_dict['avg_branching_factor'].append(stats['avg_branching_factor'])
-        stats_df_dict['min_branching_factor'].append(stats['min_branching_factor'])
-        stats_df_dict['total_nodes'].append(stats['total_nodes'])
-        stats_df_dict['branching_factors'].extend(stats['branching_factors'])
-    branching_factors_list = stats_df_dict.pop('branching_factors')
-    stats_df = pd.DataFrame.from_dict(stats_df_dict)
-    stats_df.to_excel(os.path.join(stats_dir, file.replace(".conllx", ".xlsx")), index=False)
-    files_stats['file_name'].append(file)
-    files_stats['total_sentences'].append(sent_count)
-    files_stats['total_nodes'].append(sum(stats_df_dict['total_nodes']))
-    files_stats['avg_depth'].append(sum(stats_df_dict['depth'])/len(stats_df_dict['depth']))
-    files_stats['avg_breadth'].append(sum(stats_df_dict['breadth'])/len(stats_df_dict['breadth']))
-    files_stats['avg_depth_normalized'].append(sum(stats_df_dict['depth_normalized'])/len(stats_df_dict['depth_normalized']))
-    files_stats['avg_breadth_normalized'].append(sum(stats_df_dict['breadth_normalized'])/len(stats_df_dict['breadth_normalized']))
-    files_stats['avg_branching_factor'].append(sum(branching_factors_list)/len(branching_factors_list))
-files_stats_df = pd.DataFrame.from_dict(files_stats)
-files_stats_df.to_excel(os.path.join(stats_dir, "all_files_stats.xlsx"), index=False)
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
+def main(args: argparse.Namespace) -> None:
+    os.makedirs(args.out_dir, exist_ok=True)
+
+    files = sorted([f for f in os.listdir(args.src_dir) if f.endswith(CONLLX_EXT)])
+    if not files:
+        raise FileNotFoundError(f"No {CONLLX_EXT} files found in: {args.src_dir}")
+
+    for file in tqdm.tqdm(files):
+        conll_file   = os.path.join(args.src_dir, file)
+        sentence_ids = extract_sentence_ids(conll_file)
+        conll_df     = ConllxDf(conll_file)
+
+        # Validate that sentence ID count matches parsed sentence count
+        n_parsed = conll_df.get_sentence_count()
+        if len(sentence_ids) != n_parsed:
+            raise ValueError(
+                f"[{file}] Sentence ID count ({len(sentence_ids)}) does not match "
+                f"parsed sentence count ({n_parsed}). "
+                "Check that every sentence has a '# id = ...' comment."
+            )
+
+        sent_rows = []
+        for i, sent_id in enumerate(sentence_ids):
+            sent_df = conll_df.get_df_by_id(i)
+            stats   = calculate_tree_stats(sent_df)
+            sent_rows.append({"sentence_id": sent_id, **stats})
+
+        stats_df = pd.DataFrame(sent_rows)
+        out_xlsx = os.path.join(args.out_dir, file.replace(CONLLX_EXT, ".xlsx"))
+        stats_df.to_excel(out_xlsx, index=False)
+
+    print(f"[tree_stats] Wrote stats to: {args.out_dir}")
+
+
+if __name__ == "__main__":
+    ap = argparse.ArgumentParser(
+        description="Compute tree statistics (depth/breadth/branching) from CoNLL-X files."
+    )
+    ap.add_argument(
+        "--src_dir",
+        required=True,
+        help=f"Directory containing {CONLLX_EXT} files.",
+    )
+    ap.add_argument(
+        "--out_dir",
+        required=True,
+        help="Output directory for per-file .xlsx stats and all_files_stats.xlsx.",
+    )
+    main(ap.parse_args())

@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+.ipynb_checkpoints/
+
+# Morphology databases (large binaries)
+*.db
+
+# External dependencies cloned separately
+camel_parser/
+
+# Logs and temp files
+logs.txt
+--out_csv
+
+# Generated batch/parse directories (large, reproducible)
+profiling_data/*/batches/
+profiling_data/*/batches/
+profiling_data/**/conllx/
+conllx_df/
+
+# OS
+.DS_Store

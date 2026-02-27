@@ -1,273 +1,153 @@
-import csv
+"""Create OpenAI Batch JSONL requests for CEFR-controlled essay generation.
+
+This produces a JSONL file where each line is a request payload suitable for OpenAI Batch.
+
+Input CSV expected columns (configurable):
+- prompt_id (default: prompt_id)
+- topic text (default: Arabic Text)
+- CEFR level (default: CEFR_level)
+- profile specifications (optional; default: profile_json)
+- vocabulary list (optional; default: words)
+
+Conditions:
+- P1: topic only
+- P2: topic + level
+- P3: topic + level + profile
+- P4: topic + level + vocab list
+- P5: topic + level + profile + vocab list
+
+Example:
+  python Generation/batch_creation.py \
+    --input_csv generation/prompts_with_6cefr_levels.csv \
+    --out_jsonl generation/batch_input.jsonl \
+    --condition P3 \
+    --model gpt-4o
+"""
+
+from __future__ import annotations
+
+import argparse
 import ast
 import json
-import re
+from typing import Any, Dict, List
+
 import pandas as pd
 
-CSV_PATH = "/home/nour.rabih/arwi/readability_controlled_generation/generation/prompts_with_6cefr_levels.csv"
-# VOCAB_CSV = "/home/nour.rabih/arwi/readability_controlled_generation/generation/vocabs_prompt/5levels/prompts_with_5cefr_levels_and_vocab.csv"
-BATCH_INPUT_PATH = "/home/nour.rabih/arwi/readability_controlled_generation/generation/syntax_prompt/6levels/batch_input.jsonl"
 
-#open CSV_PATH and VOCAB_CSV and merge them on prompt_id and CEFR_level
-prompts = pd.read_csv(CSV_PATH)
-# prompts = prompts[prompts['CEFR_level'].isin([ 'C1', 'C2'])]
-
-# prompts.to_csv("/home/nour.rabih/arwi/readability_controlled_generation/generation/C_prompts.csv", index=False)
-# CSV_PATH = "/home/nour.rabih/arwi/readability_controlled_generation/generation/C_prompts.csv"
-print(f"Loaded {len(prompts)} prompts from {CSV_PATH}")
-# vocab = pd.read_csv(VOCAB_CSV)
-# merged = pd.merge(prompts, vocab, on=['prompt_id', 'CEFR_level'], how='left')
-# save merged to a new CSV
-# merged.to_csv('/home/nour.rabih/arwi/generation/vocabs_prompt/3levels/prompts_with_3cefr_levels_and_vocab.csv', index=False)
-# CSV_PATH = '/home/nour.rabih/arwi/generation/vocabs_prompt/3levels/prompts_with_3cefr_levels_and_vocab.csv'
-
-# level_map = {
-#     1: "A1",
-#     2: "B1",
-#     3: "B2",
-#     4: "C1",
-#     5: "C2"
-# }
-
-tree_depth_map = {
-    "A": (4, 8),
-    # "B": (5, 8),
-    # "C": (11, 40),
-    "A1": (4, 6),
-    "A2": (6, 8),
-    "B1": (7, 10),
-    "B2": (8, 11),
-    "C1": (9, 12),
-    "C2": (9, 13),
-}
-
-def build_prompt(max_depth_low: str, max_depth_high: str, level: str, topic_text: str, profile: dict) -> str: # , words: list[str]
+SYSTEM_MSG = "You are a helpful Arabic writing assistant."
 
 
+def _parse_list_cell(x: str) -> List[str]:
+    if x is None:
+        return []
+    s = str(x).strip()
+    if not s:
+        return []
+    try:
+        return list(ast.literal_eval(s))
+    except Exception:
+        # fallback: comma-separated
+        return [w.strip() for w in s.split(",") if w.strip()]
 
 
-    # kw = "، ".join(words)
-    # return ( 
-    #     f"اكتب مقالًا إنشائيًا بمستوى قابلية قراءة {level}.\n"
-    #     f"المقال يجب أن يكون عن الموضوع التالي: {topic_text}.\n"
-    #     "يجب أن يكون المقال مترابطًا، منظمًا (مقدمة، محتوى، وخاتمة)، "
-    #     "ومناسبًا لمستوى القراءة المطلوب."
-    # )
-    # return ( #p2
-    #     f"اكتب مقالًا إنشائيًا عربيًا متكاملًا بمستوى قابلية قراءة {level}.\n"
-    #     f"يجب أن يتناول المقال الموضوع التالي: {topic_text}.\n"
-    #     "يجب أن يكون النص مترابطًا وسلسًا في فقرة أو عدة فقرات متتابعة، "
-    #     "ويعكس بنية منطقية تبدأ بتمهيد للفكرة ثم تطويرها ثم إنهائها بخلاصة طبيعية، "
-    #     "من دون استخدام عناوين أو كلمات دالة مثل (مقدمة، محتوى، خاتمة) أو أي تقسيم صريح."
-    # )
-    # return ( # p3
-    #     f""" 
-    #         اكتب مقالًا إنشائيًا متكاملًا بمستوى قابلية قراءة {level}.
-    #         يجب أن يكون المقال عن الموضوع التالي: {topic_text}.
-    #         تأكد من إدخال بعض الكلمات المفتاحية التالية بشكل طبيعي داخل النص لإنشاء قصة متماسكة جميلة: {words}.
+def _parse_json_cell(x: str) -> Dict[str, Any]:
+    if x is None:
+        return {}
+    s = str(x).strip()
+    if not s:
+        return {}
+    try:
+        return json.loads(s)
+    except Exception:
+        return {}
 
-    #         يجب أن يتكوّن المقال من مقدمة، محتوى، وخاتمة، دون أي عناوين أو تقسيمات ظاهرة.
-    #         اكتب النص كسرد متصل في فقرات متتابعة فقط، دون أي تنسيق أو عناوين فرعية.
 
-    #         احرص على أن يكون المقال مترابطًا، منظمًا، ومناسبًا لمستوى القراءة المطلوب.
-    #         تأكّد من أن جميع الجمل منطقية ومترابطة من حيث المعنى.
-    #         تجنّب أي عبارات أو أفكار غير واقعية أو غير منطقية (مثل مواقف لا تحدث في الواقع).
-    #         تأكّد من أن الأمثلة والحقائق تتوافق مع العادات، والثقافة، والمنطق العام.
-    #         احرص على أن يكون النص واضحًا وسهل الفهم دون أخطاء لغوية أو تركيبية.
-    #     """
-    # )
+def build_user_prompt(topic_text: str, level: str | None, profile: Dict[str, Any] | None, vocab: List[str] | None, condition: str) -> str:
+    topic_text = str(topic_text).strip()
+    level = str(level).strip() if level is not None else ""
+    profile = profile or {}
+    vocab = vocab or []
 
-    # return ( #p1 no level
-    #     f"اكتب مقالًا إنشائيًا عربيًا متكاملً"
-    #     f"يجب أن يتناول المقال الموضوع التالي: {topic_text}.\n"
-    #     "يجب أن يكون النص مترابطًا وسلسًا في فقرة أو عدة فقرات متتابعة، "
-    #     "ويعكس بنية منطقية تبدأ بتمهيد للفكرة ثم تطويرها ثم إنهائها بخلاصة طبيعية، "
-    #     "من دون استخدام عناوين أو كلمات دالة مثل (مقدمة، محتوى، خاتمة) أو أي تقسيم صريح."
-    # )
+    base = [
+        "Write a short Arabic essay.",
+        f"Topic: {topic_text}",
+    ]
 
-    # return (  # p5 – C-level
-    #     f"اكتب مقالًا إنشائيًا عربيًا متكاملًا بمستوى قابلية قراءة {level}.\n"
-    #     f"يجب أن يتناول المقال الموضوع التالي: {topic_text}.\n"
-    #     "ينبغي أن يكون النص مترابطًا وسلسًا في فقرة واحدة أو عدة فقرات متتابعة، "
-    #     "ويعكس بنية فكرية ناضجة تبدأ بتمهيد تحليلي للفكرة، ثم تتوسع في مناقشتها بعمق، "
-    #     "مع عرض زوايا متعددة أو وجهات نظر مختلفة عند الاقتضاء، "
-    #     "وتنتهي بخلاصة تأملية متوازنة تربط بين الأفكار المطروحة.\n"
-    #     "احرص على استخدام تراكيب لغوية متنوعة، وجمل مركبة وطويلة نسبيًا، "
-    #     "وروابط منطقية دقيقة تعكس العلاقات السببية والاستنتاجية بين الأفكار، "
-    #     "إلى جانب مفردات غنية ومتنوعة تتناسب مع موضوع المقال.\n"
-    #     "تجنب التكرار المباشر للأفكار أو الألفاظ، "
-    #     "ولا تستخدم عناوين أو كلمات دالة صريحة مثل (مقدمة، محتوى، خاتمة) أو أي تقسيم شكلي."
-    # )
+    if condition in {"P2", "P3", "P4", "P5"} and level:
+        base.append(f"Target CEFR level: {level}")
 
-    # return (  # p6 – detailed profile syntax + vocab
-    #     f"""
-    #     اكتب مقالًا إنشائيًا متكاملًا بمستوى قابلية قراءة {level}.
-    #     يجب أن يكون المقال عن الموضوع التالي: {topic_text}.
-    #     أدرج الكلمات المفتاحية التالية بشكل طبيعي داخل النص: {words}.
+    if condition in {"P3", "P5"} and profile:
+        base.append("Follow these level-specific profile constraints:")
+        base.append(json.dumps(profile, ensure_ascii=False, indent=2))
 
-    #     حاول أن يكون النص قريبًا من الخصائص العامة التالية:
+    if condition in {"P4", "P5"} and vocab:
+        base.append("Try to use the following vocabulary where appropriate:")
+        base.append(", ".join(vocab))
 
-    #     1) الطول والبنية:
-    #     - طول النص قريب من {round(profile["total_words"])}.
-    #     - طول الجمل قريب من {round(profile["avg_words_per_sentence"])}.
-    #     - عدد الكلمات الفريدة قريب من {round(profile["total_unique_words"])}.
-    #     - متوسط طول الكلمة (عدد الحروف): {round(profile["overall_avg_word_len"])}
+    base.append("Return only the essay text. Do not add explanations.")
+    return "\n".join(base)
 
-    #     3) الوصف والتفصيل:
-    #     - عدد الصفات : {round(profile["pos_ADJ_mean"])}. 
-    #     - استخدم صفات لوصف الأشخاص والأشياء والأفكار.
-    #     - كلما زاد المستوى، زادت التفاصيل.
 
-    #     4) بناء الجملة والمعنى:
-    #     - عدد الفاعل (قريب من {round(profile["dep_SBJ_mean"])}).
-    #     - عدد مفاعيل وأمثلة (قريب من {round(profile["dep_OBJ_mean"])}).
-    #     - في المستويات المتقدمة(B1-C2)، اربط السبب بالنتيجة.
-    #      5) البنية النحوية (شجرة التحليل):
-    #     - العمق الأدنى لشجرة التحليل قريب من {max_depth_low}.
-    #     - العمق الأقصى لشجرة التحليل قريب من {max_depth_high}.
-    #     - كلما ارتفع المستوى، استخدم جملًا ذات بنية أعمق وأكثر تفرعًا.
-        
-    #     6) الترابط والمنطق:
-    #     - استخدم روابط منطقية تناسب المستوى.
-    #     - في المستويات المتقدمة، استخدم التعليل والمقارنة.
-
-    #     7) الأسلوب العام:
-    #     - لا أسلوب حواري إلا في B2 أو أعلى.
-    #     - تجنّب التعجب والمبالغة في المستويات الدنيا.
-    #     - الأسلوب يجب أن يعكس مستوى متعلم حقيقي.
-
-    #     قيود مهمة:
-    #     - هذه القيم إرشادية فقط.
-    #     - لا تذكر أي أرقام في النص.
-    #     - لا تشرح هذه القيود في الناتج.
-
-    #     هيكل النص:
-    #     - مقدمة، محتوى، خاتمة بدون عناوين.
-    #     - فقرات متصلة فقط.
-
-    #     """
-    # )
-
-    return (  # p7 – detailed syntax profile
-        f"""
-        اكتب مقالًا إنشائيًا متكاملًا بمستوى قابلية قراءة {level}.
-        يجب أن يكون المقال عن الموضوع التالي: {topic_text}.
-
-        حاول أن يكون النص قريبًا من الخصائص العامة التالية:
-
-        1) الطول والبنية:
-        - طول النص قريب من {round(profile["total_words"])}.
-        - طول الجمل قريب من {round(profile["avg_words_per_sentence"])}.
-        - عدد الكلمات الفريدة قريب من {round(profile["total_unique_words"])}.
-        - متوسط طول الكلمة (عدد الحروف): {round(profile["overall_avg_word_len"])}
-
-        3) الوصف والتفصيل:
-        - عدد الصفات : {round(profile["pos_ADJ_mean"])}. 
-        - استخدم صفات لوصف الأشخاص والأشياء والأفكار.
-        - كلما زاد المستوى، زادت التفاصيل.
-
-        4) بناء الجملة والمعنى:
-        - عدد الفاعل (قريب من {round(profile["dep_SBJ_mean"])}).
-        - عدد مفاعيل وأمثلة (قريب من {round(profile["dep_OBJ_mean"])}).
-        - في المستويات المتقدمة(B1-C2)، اربط السبب بالنتيجة.
-         5) البنية النحوية (شجرة التحليل):
-        - العمق الأدنى لشجرة التحليل قريب من {max_depth_low}.
-        - العمق الأقصى لشجرة التحليل قريب من {max_depth_high}.
-        - كلما ارتفع المستوى، استخدم جملًا ذات بنية أعمق وأكثر تفرعًا.
-        
-        6) الترابط والمنطق:
-        - استخدم روابط منطقية تناسب المستوى.
-        - في المستويات المتقدمة، استخدم التعليل والمقارنة.
-
-        7) الأسلوب العام:
-        - لا أسلوب حواري إلا في B2 أو أعلى.
-        - تجنّب التعجب والمبالغة في المستويات الدنيا.
-        - الأسلوب يجب أن يعكس مستوى متعلم حقيقي.
-
-        قيود مهمة:
-        - هذه القيم إرشادية فقط.
-        - لا تذكر أي أرقام في النص.
-        - لا تشرح هذه القيود في الناتج.
-
-        هيكل النص:
-        - مقدمة، محتوى، خاتمة بدون عناوين.
-        - فقرات متصلة فقط.
-
-        """
-    )
-
-_nan_token = re.compile(r'(?<![\w])nan(?![\w])', flags=re.IGNORECASE)
-
-def parse_words_cell(s):
-    s = str(s).strip()
-    # Replace bare nan with None so it's a valid Python literal
-    s = _nan_token.sub("None", s)
-    return ast.literal_eval(s)
-
-with open(CSV_PATH, "r", encoding="utf-8") as fin, \
-     open(BATCH_INPUT_PATH, "w", encoding="utf-8") as fout:
-
-    reader = csv.DictReader(fin)
-    # vocab_reader = csv.DictReader(open(VOCAB_CSV, "r", encoding="utf-8"))
-    profiles = pd.read_csv(
-        "/home/nour.rabih/arwi/readability_controlled_generation/zaebuc+bea/selected_features_graphs/selected_readability_monotonic_features.csv"
-    ).set_index("level").to_dict(orient="index")
-    # merge vocab by prompt_id and CEFR_level into reader rows
-    # vocab_map = {}
-    # for row in vocab_reader:
-    #     key = (row["prompt_id"], row["CEFR_level"])
-        
-    #     try:
-    #         row["words"] =  parse_words_cell(row["words"])
-    #         words = row.get("words", "")
-    #         # words = ast.literal_eval(words_raw) if words_raw.strip() else []
-    #     except (SyntaxError, ValueError) as e:
-    #         # import pdb; pdb.set_trace()
-    #         raise ValueError(f"Couldn't parse words={words!r} for prompt_id={row['prompt_id']} and CEFR_level={row['CEFR_level']}") from e
-    #     vocab_map[key] = words
-    for line_num, row in enumerate(reader, start=1):
-        prompt_id = row.get("prompt_id")
-        level     = row.get("CEFR_level")
-        topic_text = row.get("Arabic Text")
-        words_raw = row.get("words", "")
-        profile = profiles.get(level)
-        if level == "A":
-        # the values are the averages across A1 and A2, apply on all columns
-            profile = {
-                "total_words": int((profiles["A1"]["total_words"] + profiles["A2"]["total_words"]) / 2),
-                "avg_words_per_sentence": int((profiles["A1"]["avg_words_per_sentence"] + profiles["A2"]["avg_words_per_sentence"]) / 2),
-                "total_unique_words": int((profiles["A1"]["total_unique_words"] + profiles["A2"]["total_unique_words"]) / 2),
-                "overall_avg_word_len": round((profiles["A1"]["overall_avg_word_len"] + profiles["A2"]["overall_avg_word_len"]) / 2, 2),
-                "pos_ADJ_mean": round((profiles["A1"]["pos_ADJ_mean"] + profiles["A2"]["pos_ADJ_mean"]) / 2, 2),
-                "dep_SBJ_mean": round((profiles["A1"]["dep_SBJ_mean"] + profiles["A2"]["dep_SBJ_mean"]) / 2, 2),
-                "dep_OBJ_mean": round((profiles["A1"]["dep_OBJ_mean"] + profiles["A2"]["dep_OBJ_mean"]) / 2, 2),
-            }
-
-        # words = vocab_map.get((prompt_id, level), [])
-
-        if not prompt_id or not topic_text or not level:
-            print(f"[WARN] Skipping line {line_num}: missing prompt_id, level, or Arabic Text")
-            continue
-
-        depth_min, depth_max = tree_depth_map[level]
-        user_prompt = build_prompt(depth_min, depth_max, level, topic_text, profile) # , words
-
-        # for i in range(10):  # 10 essays per prompt
-        custom_id = f"{prompt_id}_{level}_6levels_p7" # _{i+1}
-        body = {
-            "model": "gpt-4o",
+def make_request(custom_id: str, model: str, user_prompt: str, temperature: float, max_tokens: int) -> Dict[str, Any]:
+    return {
+        "custom_id": custom_id,
+        "method": "POST",
+        "url": "/v1/chat/completions",
+        "body": {
+            "model": model,
             "messages": [
-                {"role": "system", "content": "أنت مساعد يكتب مقالات إنشائية عربية بمستويات قرائية مختلفة."},
+                {"role": "system", "content": SYSTEM_MSG},
                 {"role": "user", "content": user_prompt},
             ],
-            "temperature": 0.7,
-        }
-        batch_line = {
-            "custom_id": custom_id,
-            "method": "POST",
-            "url": "/v1/chat/completions",
-            "body": body,
-        }
-        fout.write(json.dumps(batch_line, ensure_ascii=False) + "\n")
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+        },
+    }
 
-print(f"✅ Built batch input file at {BATCH_INPUT_PATH}")
+
+def main(args):
+    df = pd.read_csv(args.input_csv)
+
+    for col in [args.prompt_id_col, args.topic_col]:
+        if col not in df.columns:
+            raise ValueError(f"Missing required column '{col}'. Found: {list(df.columns)}")
+
+    # Optional columns
+    if args.level_col and args.level_col not in df.columns and args.condition != "P1":
+        raise ValueError(f"Condition {args.condition} requires --level_col, but '{args.level_col}' not found.")
+
+    out_rows = []
+    for _, r in df.iterrows():
+        pid = str(r[args.prompt_id_col])
+        topic = r[args.topic_col]
+        level = r[args.level_col] if args.level_col in df.columns else None
+        profile = _parse_json_cell(r[args.profile_col]) if args.profile_col in df.columns else {}
+        vocab = _parse_list_cell(r[args.vocab_col]) if args.vocab_col in df.columns else []
+
+        user_prompt = build_user_prompt(topic, level, profile, vocab, args.condition)
+        out_rows.append(make_request(pid, args.model, user_prompt, args.temperature, args.max_tokens))
+
+    with open(args.out_jsonl, "w", encoding="utf-8") as f:
+        for row in out_rows:
+            f.write(json.dumps(row, ensure_ascii=False) + "\n")
+
+    print(f"Wrote: {args.out_jsonl} ({len(out_rows)} requests)")
+
+
+if __name__ == "__main__":
+    ap = argparse.ArgumentParser(description="Create OpenAI Batch JSONL input for essay generation.")
+    ap.add_argument("--input_csv", required=True)
+    ap.add_argument("--out_jsonl", required=True)
+
+    ap.add_argument("--condition", choices=["P1", "P2", "P3", "P4", "P5"], required=True)
+    ap.add_argument("--model", default="gpt-4o")
+    ap.add_argument("--temperature", type=float, default=0.7)
+    ap.add_argument("--max_tokens", type=int, default=800)
+
+    ap.add_argument("--prompt_id_col", default="prompt_id")
+    ap.add_argument("--topic_col", default="Arabic Text")
+    ap.add_argument("--level_col", default="CEFR_level")
+    ap.add_argument("--profile_col", default="profile_json")
+    ap.add_argument("--vocab_col", default="words")
+
+    main(ap.parse_args())

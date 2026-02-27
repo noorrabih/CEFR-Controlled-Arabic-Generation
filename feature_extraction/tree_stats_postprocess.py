@@ -1,231 +1,311 @@
-# merge all tree stats files into one
-# /l/users/nour.rabih/arwi_data_corrected_essays/clean_essays_readability_avg.csv for levels
-# new csv that merges each sentence , get the avg, max of each stat, and contains a list of all stats per sentence 
-# merge with levels
-import pandas as pd
+"""Aggregate tree statistics per essay and optionally visualize vs CEFR.
+
+Inputs:
+  --stats_dir       Directory containing per-file .xlsx stats produced by
+                    tree_stats.py (one xlsx per .conllx file).
+  --readability_csv CSV containing a Document_ID column and a CEFR column.
+
+Outputs:
+  --out_csv         Aggregated CSV per essay (with CEFR joined).
+  --out_dir         Directory for optional heatmap PNGs.
+
+Example:
+  python feature_extraction/tree_stats_postprocess.py \
+    --stats_dir <stats_dir> \
+    --readability_csv <readability_csv> \
+    --out_csv <out_csv> \
+    --out_dir <out_dir> \
+    --make_heatmaps
+"""
+
+from __future__ import annotations
+
+import argparse
 import os
 from glob import glob
-
-# ========= 1. Load & merge all tree stats files =========
-stats_dir = "/home/nour.rabih/arwi/readability_controlled_generation/generation/no_level/essays_parsed_Text_100/tree_stats"
-readability_path = "/home/nour.rabih/arwi/readability_controlled_generation/generation/no_level/generated_essays_p4_readability.csv"
-
-
-output_path = "/home/nour.rabih/arwi/readability_controlled_generation/generation/no_level/tree_graphs/tree_stats_aggregated_with_readability.csv"
-
-directory =  "/home/nour.rabih/arwi/readability_controlled_generation/generation/no_level/tree_graphs"
-all_files = glob(os.path.join(stats_dir, "batch_*.xlsx"))
-
-dfs = []
-for f in all_files:
-    tmp = pd.read_excel(f)
-    dfs.append(tmp)
-
-df = pd.concat(dfs, ignore_index=True)
-
-# ========= 2. Create essay_id from sentence_id =========
-# df["essay_id"] = df["sentence_id"].astype(str).str.split("-").str[2]
-df["essay_id"] = df["sentence_id"].astype(str).str.rsplit("-", n=1).str[0]
-print(df["essay_id"].head())
-
-# ========= 3. Aggregate stats per essay =========
-# If you want ALL numeric stats, not just depth/breadth/max_branching_factor:
-include_cols = ["depth", "breadth", "total_nodes", "max_branching_factor"]
-stat_cols = [c for c in df.columns if c  in include_cols and pd.api.types.is_numeric_dtype(df[c])]
-
-agg_funcs = {col: ["mean", "max", list] for col in stat_cols}
-
-grouped = df.groupby("essay_id").agg(agg_funcs)
-
-# Flatten MultiIndex columns
-grouped.columns = [f"{c[0]}_{c[1]}" for c in grouped.columns.to_flat_index()]
-grouped = grouped.reset_index()
-
-# Convert list columns to comma-separated strings for CSV compatibility
-for col in grouped.columns:
-    if col.endswith("_list"):
-        grouped[col] = grouped[col].apply(lambda x: ",".join(str(v) for v in x))
-
-# ========= 4. Merge with readability levels (CEFR, avg_readability_level) =========
-read_df = pd.read_csv(readability_path)
-
-# Make sure both keys have the SAME dtype (string)
-grouped["essay_id"] = grouped["essay_id"].astype(str)
-read_df["Document_ID"] = read_df["ID"].astype(str)
-# id: 1_A1_1  i want CEFR to be A1
-if 'CEFR' not in read_df.columns:
-    read_df['CEFR'] =  read_df['ID'].str.split('_').str[1]
-
-merged = grouped.merge(
-    read_df[["Document_ID", "CEFR"]], # avg_level
-    left_on="essay_id",
-    right_on="Document_ID",
-    how="left",
-)
-
-merged = merged.drop(columns=["Document_ID"])
-
-# ========= 5. Save =========
-merged.to_csv(output_path, index=False)
-print("Saved to:", output_path)
-print(merged.head())
+from typing import List, Optional
 
 import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
-
-# output_path = "/home/nour.rabih/arwi/readability_controlled_generation/ZAEBUC-v1.01/tree_graphs/tree_stats_aggregated_with_readability.csv"
-# directory =  "/home/nour.rabih/arwi/readability_controlled_generation/ZAEBUC-v1.01/tree_graphs"
-# # bea = pd.read_csv("/home/nour.rabih/arwi/readability_controlled_generation/arabic-aes-bea25/Data/tree_graphs/tree_stats_aggregated_with_readability.csv")
-# zaebuc = pd.read_csv("/home/nour.rabih/arwi/readability_controlled_generation/ZAEBUC-v1.01/tree_graphs/tree_stats_aggregated_with_readability.csv")
-# zaebuc = zaebuc[zaebuc['CEFR'] != 'Unassessable']
-# df = zaebuc.copy()
-# df = pd.concat([bea, zaebuc], ignore_index=True)
-# df.to_csv(output_path, index=False)
-# Load data
-df = merged
-
-# Round depth_mean
-df['depth_mean_rounded'] = df['depth_mean'].round(0).astype(int)
-
-# Pivot
-pivot = df.pivot_table(
-    index='depth_mean_rounded',
-    columns='CEFR',
-    aggfunc='size',
-    fill_value=0
-)
-
-plt.figure(figsize=(10,7))
-
-# Use the same colormap as your example: YlGnBu
-sns.heatmap(pivot, annot=True, fmt="d", cmap="YlGnBu")
-
-plt.title("Relation between depth_mean and CEFR")
-plt.xlabel("CEFR")
-plt.ylabel("depth_mean (rounded)")
-
-plt.tight_layout()
-plt.show()
-
-plt.savefig(f"{directory}/depth_mean_vs_CEFR_heatmap.png")
 
 
-# Pivot depth_max
-pivot = df.pivot_table(
-    index='depth_max',
-    columns='CEFR',
-    aggfunc='size',
-    fill_value=0
-)
+# ---------------------------------------------------------------------------
+# Aggregation
+# ---------------------------------------------------------------------------
 
-plt.figure(figsize=(10,7))
+def aggregate_tree_stats(
+    stats_dir: str,
+    include_cols: Optional[List[str]] = None,
+) -> pd.DataFrame:
+    """Aggregate per-sentence tree stats to per-essay level.
 
-# Use the same colormap as your example: YlGnBu
-sns.heatmap(pivot, annot=True, fmt="d", cmap="YlGnBu")
+    Reads all .xlsx files in ``stats_dir`` (as produced by tree_stats.py),
+    derives an essay ID from the sentence ID (everything before the last dash),
+    and aggregates numeric stat columns with mean, max, and list.
 
-plt.title("Relation between depth_max and CEFR")
-plt.xlabel("CEFR")
-plt.ylabel("depth_max")
+    Args:
+        stats_dir:    Directory containing .xlsx stat files.
+        include_cols: Stat columns to aggregate. Defaults to depth, breadth,
+                      total_nodes, max_branching_factor.
 
-plt.tight_layout()
-plt.show()
+    Returns:
+        DataFrame with one row per essay and aggregated stat columns.
 
-plt.savefig(f"{directory}/depth_max_vs_CEFR_heatmap.png")
+    Raises:
+        FileNotFoundError: If no .xlsx files are found in ``stats_dir``.
+        ValueError:        If required columns are missing.
+    """
+    include_cols = include_cols or [
+        "depth", "breadth", "total_nodes", "max_branching_factor"
+    ]
 
+    all_files = sorted(glob(os.path.join(stats_dir, "*.xlsx")))
+    if not all_files:
+        raise FileNotFoundError(f"No .xlsx files found in: {stats_dir}")
 
-# Pivot breadth_mean
+    dfs = [pd.read_excel(f) for f in all_files]
+    df  = pd.concat(dfs, ignore_index=True)
 
-df['breadth_mean_rounded'] = df['breadth_mean'].round(0).astype(int)
+    if "sentence_id" not in df.columns:
+        raise ValueError(
+            f"Expected 'sentence_id' column in tree stats. "
+            f"Found: {list(df.columns)}"
+        )
 
-pivot = df.pivot_table(
-    index='breadth_mean_rounded',
-    columns='CEFR',
-    aggfunc='size',
-    fill_value=0
-)
+    # Essay ID = everything before the last dash  (e.g. "AR-030-268469-3" → "AR-030-268469")
+    df["essay_id"] = df["sentence_id"].astype(str).str.rsplit("-", n=1).str[0]
 
-plt.figure(figsize=(10,7))
+    stat_cols = [
+        c for c in include_cols
+        if c in df.columns and pd.api.types.is_numeric_dtype(df[c])
+    ]
+    if not stat_cols:
+        raise ValueError(
+            f"No numeric stat columns found among: {include_cols}. "
+            f"Available: {list(df.columns)}"
+        )
 
-# Use the same colormap as your example: YlGnBu
-sns.heatmap(pivot, annot=True, fmt="d", cmap="YlGnBu")
+    agg_funcs = {col: ["mean", "max", list] for col in stat_cols}
+    grouped   = df.groupby("essay_id").agg(agg_funcs)
 
-plt.title("Relation between breadth_mean and CEFR")
-plt.xlabel("CEFR")
-plt.ylabel("breadth_mean")
+    grouped.columns = [f"{c[0]}_{c[1]}" for c in grouped.columns.to_flat_index()]
+    grouped = grouped.reset_index()
 
-plt.tight_layout()
-plt.show()
+    # Serialize list columns to comma-separated strings for CSV compatibility
+    for col in grouped.columns:
+        if col.endswith("_list"):
+            grouped[col] = grouped[col].apply(
+                lambda x: ",".join(str(v) for v in x)
+            )
 
-plt.savefig(f"{directory}/breadth_mean_vs_CEFR_heatmap.png")
-
-# Pivot breadth_max
-pivot = df.pivot_table(
-    index='breadth_max',
-    columns='CEFR',
-    aggfunc='size',
-    fill_value=0
-)
-
-plt.figure(figsize=(10,7))
-
-# Use the same colormap as your example: YlGnBu
-sns.heatmap(pivot, annot=True, fmt="d", cmap="YlGnBu")
-
-plt.title("Relation between breadth_max and CEFR")
-plt.xlabel("CEFR")
-plt.ylabel("breadth_max")
-
-plt.tight_layout()
-plt.show()
-
-plt.savefig(f"{directory}/breadth_max_vs_CEFR_heatmap.png")
-
+    return grouped
 
 
-# Round total_nodes_mean
-df['total_nodes_mean_rounded'] = df['total_nodes_mean'].round(0).astype(int)
+# ---------------------------------------------------------------------------
+# CEFR joining
+# ---------------------------------------------------------------------------
 
-# Pivot
-pivot = df.pivot_table(
-    index='total_nodes_mean_rounded',
-    columns='CEFR',
-    aggfunc='size',
-    fill_value=0
-)
+def merge_cefr(
+    grouped: pd.DataFrame,
+    readability_csv: str,
+    id_col: str = "Document_ID",
+    cefr_col: Optional[str] = "CEFR",
+) -> pd.DataFrame:
+    """Join CEFR labels from a readability CSV onto the aggregated stats.
 
-plt.figure(figsize=(10,7))
+    Attempts a direct join on essay_id == id_col. If no matches are found,
+    retries by stripping everything up to the last dash from essay_id
+    (e.g. "AR-030-268469" → "268469") to handle ZAEBUC-style IDs.
 
-# Use the same colormap as your example: YlGnBu
-sns.heatmap(pivot, annot=True, fmt="d", cmap="YlGnBu")
+    Args:
+        grouped:         Aggregated stats DataFrame from :func:`aggregate_tree_stats`.
+        readability_csv: Path to CSV containing ``id_col`` and ``cefr_col``.
+        id_col:          ID column name in the readability CSV.
+        cefr_col:        CEFR column name in the readability CSV.
 
-plt.title("Relation between total_nodes_mean and CEFR")
-plt.xlabel("CEFR")
-plt.ylabel("total_nodes_mean (rounded)")
+    Returns:
+        Merged DataFrame with a ``CEFR`` column added.
 
-plt.tight_layout()
-plt.show()
+    Raises:
+        ValueError: If required columns are missing from the readability CSV.
+    """
+    read_df = pd.read_csv(readability_csv, dtype=str)
 
-plt.savefig(f"{directory}/total_nodes_mean_vs_CEFR_heatmap.png")
+    if id_col not in read_df.columns:
+        raise ValueError(
+            f"readability_csv missing '{id_col}' column. "
+            f"Found: {list(read_df.columns)}"
+        )
 
-# Pivot total_nodes_max
-pivot = df.pivot_table(
-    index='total_nodes_max',
-    columns='CEFR',
-    aggfunc='size',
-    fill_value=0
-)
+    if cefr_col and cefr_col in read_df.columns:
+        read_df["CEFR"] = read_df[cefr_col].astype(str)
+    else:
+        # Fallback: infer CEFR from ID patterns like "1_A1_1"
+        print(
+            f"[WARNING] CEFR column '{cefr_col}' not found in readability CSV. "
+            "Attempting to infer CEFR from ID field (expects pattern like '1_A1_1'). "
+            "Results may be incorrect if IDs do not follow this pattern."
+        )
+        read_df["CEFR"] = read_df[id_col].astype(str).str.split("_").str[1]
 
-plt.figure(figsize=(10,7))
+    read_df["Document_ID"] = read_df[id_col].astype(str)
+    grouped = grouped.copy()
+    grouped["essay_id"] = grouped["essay_id"].astype(str)
 
-# Use the same colormap as your example: YlGnBu
-sns.heatmap(pivot, annot=True, fmt="d", cmap="YlGnBu")
+    merged = grouped.merge(
+        read_df[["Document_ID", "CEFR"]],
+        left_on="essay_id",
+        right_on="Document_ID",
+        how="left",
+    )
 
-plt.title("Relation between total_nodes_max and CEFR")
-plt.xlabel("CEFR")
-plt.ylabel("total_nodes_max")
+    # Retry with suffix-stripped IDs if nothing matched
+    if merged["CEFR"].isna().all():
+        print(
+            "[WARNING] No CEFR matches found on full essay_id. "
+            "Retrying with last segment of essay_id (e.g. 'AR-030-268469' → '268469')."
+        )
+        grouped["essay_id"] = grouped["essay_id"].str.split("-").str[-1]
+        merged = grouped.merge(
+            read_df[["Document_ID", "CEFR"]],
+            left_on="essay_id",
+            right_on="Document_ID",
+            how="left",
+        )
 
-plt.tight_layout()
-plt.show()
+    if merged["CEFR"].isna().all():
+        print(
+            "[WARNING] CEFR column is entirely empty after merge. "
+            "Check that Document_ID values in the readability CSV match essay IDs."
+        )
 
-plt.savefig(f"{directory}/total_nodes_max_vs_CEFR_heatmap.png")
+    merged = merged.drop(columns=["Document_ID"])
+    return merged
+
+
+# ---------------------------------------------------------------------------
+# Visualization
+# ---------------------------------------------------------------------------
+
+def make_heatmaps(df: pd.DataFrame, out_dir: str, metrics: List[str]) -> None:
+    """Save heatmap PNGs showing the distribution of each metric vs CEFR level.
+
+    Imports matplotlib and seaborn lazily since they are optional dependencies
+    only needed when --make_heatmaps is passed.
+
+    Args:
+        df:      DataFrame with metric columns and a ``CEFR`` column.
+        out_dir: Directory to write heatmap PNG files.
+        metrics: List of column names to plot.
+    """
+    import matplotlib.pyplot as plt  # optional dep — imported here intentionally
+    import seaborn as sns             # optional dep — imported here intentionally
+
+    os.makedirs(out_dir, exist_ok=True)
+    print(f"[make_heatmaps] Metrics: {metrics}")
+    print(f"[make_heatmaps] CEFR levels: {sorted(df['CEFR'].dropna().unique())}")
+
+    for metric in metrics:
+        if metric not in df.columns:
+            print(f"[make_heatmaps] Skipping '{metric}' — column not found.")
+            continue
+
+        tmp = df.dropna(subset=[metric, "CEFR"]).copy()
+        if tmp.empty:
+            continue
+
+        if tmp[metric].dtype.kind in "fc":
+            tmp["metric_rounded"] = tmp[metric].round(0).astype(int)
+        else:
+            tmp["metric_rounded"] = (
+                pd.to_numeric(tmp[metric], errors="coerce").round(0).astype("Int64")
+            )
+
+        tmp = tmp.dropna(subset=["metric_rounded"])
+        pivot = tmp.pivot_table(
+            index="metric_rounded", columns="CEFR", aggfunc="size", fill_value=0
+        )
+
+        plt.figure(figsize=(10, 7))
+        sns.heatmap(pivot, annot=True, fmt="d", cmap="YlGnBu")
+        plt.title(f"{metric} vs CEFR")
+        plt.xlabel("CEFR")
+        plt.ylabel(f"{metric} (rounded)")
+        plt.tight_layout()
+
+        out_path = os.path.join(out_dir, f"{metric}_vs_CEFR_heatmap.png")
+        plt.savefig(out_path, dpi=200, bbox_inches="tight")
+        plt.close()
+        print(f"[make_heatmaps] Saved: {out_path}")
+
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
+def main(args: argparse.Namespace) -> None:
+    grouped = aggregate_tree_stats(args.stats_dir)
+
+    merged = merge_cefr(
+        grouped,
+        readability_csv=args.readability_csv,
+        id_col=args.readability_id_col,
+        cefr_col=args.readability_cefr_col,
+    )
+
+    out_dir = os.path.dirname(args.out_csv)
+    if out_dir:
+        os.makedirs(out_dir, exist_ok=True)
+    merged.to_csv(args.out_csv, index=False)
+    print(f"[tree_stats_postprocess] Saved: {args.out_csv}")
+
+    if args.make_heatmaps:
+        metrics = [m.strip() for m in args.heatmap_metrics.split(",")]
+        make_heatmaps(merged, args.out_dir, metrics)
+        print(f"[tree_stats_postprocess] Saved heatmaps to: {args.out_dir}")
+
+
+if __name__ == "__main__":
+    ap = argparse.ArgumentParser(
+        description="Aggregate tree stats per essay and optionally visualize vs CEFR."
+    )
+    ap.add_argument(
+        "--stats_dir",
+        required=True,
+        help="Directory containing .xlsx stat files from tree_stats.py.",
+    )
+    ap.add_argument(
+        "--readability_csv",
+        required=True,
+        help="CSV with Document_ID and CEFR columns.",
+    )
+    ap.add_argument(
+        "--readability_id_col",
+        default="Document_ID",
+        help="ID column name in readability CSV (default: Document_ID).",
+    )
+    ap.add_argument(
+        "--readability_cefr_col",
+        default="CEFR",
+        help="CEFR column name in readability CSV (default: CEFR).",
+    )
+    ap.add_argument(
+        "--out_csv",
+        required=True,
+        help="Output CSV path for aggregated stats.",
+    )
+    ap.add_argument(
+        "--out_dir",
+        default=".",
+        help="Output directory for heatmap PNGs (default: current directory).",
+    )
+    ap.add_argument(
+        "--make_heatmaps",
+        action="store_true",
+        help="If set, save heatmap PNGs to --out_dir.",
+    )
+    ap.add_argument(
+        "--heatmap_metrics",
+        default="depth_mean,depth_max,breadth_mean,breadth_max,total_nodes_mean,total_nodes_max",
+        help="Comma-separated list of metrics to plot (default: depth/breadth/total_nodes mean+max).",
+    )
+    main(ap.parse_args())

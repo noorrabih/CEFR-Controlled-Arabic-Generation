@@ -1,80 +1,104 @@
-import time
+"""Upload a Batch JSONL file to OpenAI and (optionally) retrieve results.
+
+This script uses the OpenAI Python SDK (>=1.x).
+
+Typical workflow:
+1) Create batch_input.jsonl with Generation/batch_creation.py
+2) Upload + create batch:
+   python Generation/upload_run.py --batch_input batch_input.jsonl --out_tsv generated_essays.tsv
+
+Notes:
+- Requires OPENAI_API_KEY in environment.
+- By default, this script will create the batch and then poll until completion.
+  Use --no_poll if you want to stop after creating the batch.
+"""
+
+from __future__ import annotations
+
+import argparse
 import json
+import os
+import time
+
+import pandas as pd
 from openai import OpenAI
 
 
-client = OpenAI(api_key="key")  # expects OPENAI_API_KEY in env
-
-BATCH_INPUT_PATH = "/home/nour.rabih/arwi/readability_controlled_generation/generation/syntax_prompt/6levels/batch_input.jsonl"
-OUT_PATH = "/home/nour.rabih/arwi/readability_controlled_generation/generation/syntax_prompt/6levels/generated_essays_6levels.tsv"
-
-# 1) Upload JSONL file
-batch_file = client.files.create(
-    file=open(BATCH_INPUT_PATH, "rb"),
-    purpose="batch",
-)
-
-print("Uploaded file id:", batch_file.id)
-
-# 2) Create batch job
-batch = client.batches.create(
-    input_file_id=batch_file.id,
-    endpoint="/v1/chat/completions",
-    completion_window="24h",  # only option for now
-)
-
-print("Batch id:", batch.id, "status:", batch.status)
-
-
-
-# batch = client.batches.retrieve("batch_693bf16d672081908f056e7861ba29b6")
-
-BATCH_ID = batch.id
-
-# 1) Poll status (you can also just check in the dashboard)
-while True:
-    batch = client.batches.retrieve(BATCH_ID)
-    print("Status:", batch.status)
-    if batch.status in ("completed", "failed", "cancelled", "expired"):
-        break
-    time.sleep(10)
-
-if batch.status != "completed":
-    raise RuntimeError(f"Batch finished with status {batch.status}")
-
-# 2) Get output file content
-output_file_id = batch.output_file_id
-result_stream = client.files.content(output_file_id)
-result_text = result_stream.read().decode("utf-8")
-
-# 3) Parse each result line and save essays as TSV
-with open(OUT_PATH, "w", encoding="utf-8") as fout:
-    # Write TSV header
-    fout.write("Document_ID\tGrade\tessay\n")
-
-    for line in result_text.splitlines():
-        if not line.strip():
-            continue
-
+def extract_essay_from_response_line(line: str) -> tuple[str, str] | None:
+    """Return (custom_id, essay_text) from a batch output line."""
+    try:
         obj = json.loads(line)
+        custom_id = obj.get("custom_id")
+        body = obj.get("response", {}).get("body", {})
+        choices = body.get("choices", [])
+        if not choices:
+            return None
+        content = choices[0].get("message", {}).get("content", "")
+        return custom_id, content
+    except Exception:
+        return None
 
-        custom_id = obj["custom_id"]
-        error = obj.get("error")
-        if error:
-            print("[ERROR in]", custom_id, error)
-            continue
 
-        response = obj["response"]["body"]
-        essay = response["choices"][0]["message"]["content"]
+def main(args):
+    api_key = os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        raise EnvironmentError("OPENAI_API_KEY is not set.")
 
-        # custom_id = f"{prompt_id}_{level}_{i+1}"
-        parts = custom_id.split("_")
-        prompt_id = parts[0]
-        level = parts[1]
+    client = OpenAI(api_key=api_key)
 
-        # Clean essay (important for TSV integrity)
-        essay = essay.replace("\t", " ").replace("\n", " ").strip()
+    # Upload file
+    with open(args.batch_input, "rb") as f:
+        uploaded = client.files.create(file=f, purpose="batch")
 
-        fout.write(f"{custom_id}\t{level}\t{essay}\n")
+    batch = client.batches.create(
+        input_file_id=uploaded.id,
+        endpoint="/v1/chat/completions",
+        completion_window=args.completion_window,
+        metadata={"description": args.description} if args.description else None,
+    )
 
-print(f"✅ Wrote parsed essays to {OUT_PATH}")
+    print("Batch created:", batch.id)
+
+    if args.no_poll:
+        return
+
+    # Poll
+    while True:
+        b = client.batches.retrieve(batch.id)
+        status = b.status
+        print("Status:", status)
+        if status in {"completed", "failed", "cancelled", "expired"}:
+            batch = b
+            break
+        time.sleep(args.poll_seconds)
+
+    if batch.status != "completed":
+        raise RuntimeError(f"Batch did not complete successfully. Status: {batch.status}")
+
+    if not batch.output_file_id:
+        raise RuntimeError("Batch completed but no output_file_id found.")
+
+    # Download output file content
+    content = client.files.content(batch.output_file_id).text
+
+    rows = []
+    for line in content.splitlines():
+        parsed = extract_essay_from_response_line(line)
+        if parsed:
+            custom_id, essay_text = parsed
+            rows.append({"ID": custom_id, "essay": essay_text})
+
+    out_df = pd.DataFrame(rows)
+    out_df.to_csv(args.out_tsv, sep="\t", index=False)
+    print(f"Wrote: {args.out_tsv} ({len(out_df)} rows)")
+
+
+if __name__ == "__main__":
+    ap = argparse.ArgumentParser(description="Upload and run an OpenAI Batch job for essay generation.")
+    ap.add_argument("--batch_input", required=True, help="Path to batch_input.jsonl")
+    ap.add_argument("--out_tsv", required=True, help="Output TSV for generated essays")
+    ap.add_argument("--completion_window", default="24h")
+    ap.add_argument("--description", default=None)
+    ap.add_argument("--poll_seconds", type=int, default=10)
+    ap.add_argument("--no_poll", action="store_true")
+    main(ap.parse_args())

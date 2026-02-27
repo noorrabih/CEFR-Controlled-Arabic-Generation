@@ -1,40 +1,64 @@
-# open /home/nour.rabih/arwi/readability_controlled_generation/zaebuc+bea/selected_features_graphs/selected_readability_monotonic_features.csv
+"""Filter a feature summary table to a selected feature set.
+
+Typical use:
+- You have a CSV listing the selected (monotonic) features as columns.
+- You have separate level-wise summaries from surface/camel/syntax.
+- You want a single CSV containing only those selected features.
+
+Example:
+  python utils/features_filter.py \
+    --selected_features_csv selected_readability_monotonic_features.csv \
+    --surface_csv surface_feats/level_summary.csv \
+    --camel_csv surface_feats/level_features_camel.csv \
+    --syntax_csv syntax/level_syntax_stats.csv \
+    --out_csv filtered_monotonic_features.csv
+"""
+
+from __future__ import annotations
+
+import argparse
 import pandas as pd
 
-selected_features_df = pd.read_csv("/home/nour.rabih/arwi/readability_controlled_generation/zaebuc+bea/selected_features_graphs/selected_readability_monotonic_features.csv")
 
-print("Selected features:")
-print(len(selected_features_df.columns))
-directory = "/home/nour.rabih/arwi/readability_controlled_generation/generation/vocabs_prompt/5levels"
-# open words /home/nour.rabih/arwi/readability_controlled_generation/generation/plain_prompt/6levels/surface_feats/level_summary.csv
-words_df = pd.read_csv(f"{directory}/surface_feats/level_summary.csv")
+def main(args):
+    selected = pd.read_csv(args.selected_features_csv)
+    selected_cols = list(selected.columns)
 
-# open camel /home/nour.rabih/arwi/readability_controlled_generation/generation/plain_prompt/6levels/surface_feats/level_features_camel.csv
-camel_df = pd.read_csv(f"{directory}/surface_feats/level_features_camel.csv")
+    surface_df = pd.read_csv(args.surface_csv)
+    camel_df = pd.read_csv(args.camel_csv)
+    syntax_df = pd.read_csv(args.syntax_csv)
 
-# syntax  /home/nour.rabih/arwi/readability_controlled_generation/generation/plain_prompt/6levels/syntax/level_syntax_stats.csv
-# syntax_df = pd.read_csv(f"{directory}/syntax/level_syntax_stats.csv")
-syntax_df = pd.read_csv(f"{directory}/syntax/level_syntax_stats.csv")
-# import pdb; pdb.set_trace()
-# merge all dataframes on 'level' column
-merged_df = words_df.merge(camel_df, on='level').merge(syntax_df, on='level')
+    # Normalize join key
+    join_key = args.join_key
+    for d in (surface_df, camel_df, syntax_df):
+        if join_key not in d.columns:
+            raise ValueError(f"Missing join key '{join_key}' in one of the inputs. Columns: {list(d.columns)}")
 
-# filter merged_df to keep only columns in selected_features_df.columns
-# if column not in index assign it nan
+    merged = surface_df.merge(camel_df, on=join_key, how="inner").merge(syntax_df, on=join_key, how="inner")
 
-filtered_df = merged_df[[col for col in selected_features_df.columns if col in merged_df.columns]]
-print("Filtered features:")
-print(len(filtered_df.columns))
-# if any columns are missing, assign them nan values
-for col in selected_features_df.columns:
-    if col not in filtered_df.columns:
-        filtered_df[col] = float('nan')
+    # Keep columns that exist; create missing ones as NaN for schema compatibility
+    keep = [c for c in selected_cols if c in merged.columns]
+    filtered = merged.loc[:, keep].copy()
 
-# filtered_df = merged_df[selected_features_df.columns]
+    missing = [c for c in selected_cols if c not in merged.columns]
+    for c in missing:
+        filtered[c] = float('nan')
+
+    # Reorder to match selected schema
+    filtered = filtered[selected_cols]
+
+    filtered.to_csv(args.out_csv, index=False)
+    print(f"Saved: {args.out_csv}")
+    if missing:
+        print(f"Warning: {len(missing)} selected columns were missing in merged inputs and were filled with NaN.")
 
 
-print("Filtered features:")
-print(len(filtered_df.columns))
-
-filtered_df.to_csv(f"{directory}/filtered_monotonic_features.csv", index=False)
-# "['CEFR', 'depPOS_SBJ(CCONJ)_mean', 'depPOS_PRD(X)_mean', 'depPOS_IDF(PART)_sum', 'depPOS_OBJ(INTJ)_sum', 'depPOS_OBJ(PUNCT)_sum', 'depPOS_TPC(NUM)_sum', 'depPOS_PRD(X)_sum']
+if __name__ == "__main__":
+    ap = argparse.ArgumentParser(description="Filter merged feature summaries to a selected feature set.")
+    ap.add_argument("--selected_features_csv", required=True)
+    ap.add_argument("--surface_csv", required=True)
+    ap.add_argument("--camel_csv", required=True)
+    ap.add_argument("--syntax_csv", required=True)
+    ap.add_argument("--join_key", default="level")
+    ap.add_argument("--out_csv", required=True)
+    main(ap.parse_args())

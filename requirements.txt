@@ -1,0 +1,13 @@
+pandas
+numpy
+matplotlib
+seaborn
+scikit-learn
+scipy
+openpyxl
+camel-tools
+transformers
+torch
+openai
+sentence-transformers
+xmltodict

@@ -1,249 +1,403 @@
-# Data Sources
+# CEFR-Controlled Arabic Generation
 
-In this work, we leverage two learner corpora:
+This repo contains the code for generating **CEFR-controlled Arabic essays** and evaluating them using:
 
-- **ZAEBUC**
-- **ARWI**
+- **Readability alignment** (predicting BAREC / Taha-19 levels)
+- **Linguistic profiling** (surface, lexical, syntactic features)
+- **Profile-based evaluation** (feature filtering + cosine similarity)
+- **Vocabulary list construction** (GPT vocab generation + SAMER filtering + relevance expansion)
 
-Both datasets are preprocessed before running the experiments.
-
----
-
-## ZAEBUC
-
-In ZAEBUC, corrected essays are presented **one word per row**.  
-Therefore, we merge them into full essays before further processing.
-
-### Preprocessing
-
-**Script:**  
-`preprocessing/zaebuc_merge_correct_essays.py`
-
-**Functionality:**
-- Merges corrected essays into full essays  
-- Outputs: `full_texts.tsv`
+The pipeline is built around two learner corpora: **ZAEBUC** and **ARWI**.
 
 ---
 
-## ARWI
+## Table of Contents
 
-The ARWI dataset is already formatted as full essays and does not require merging.
-
----
-
-# Readability Alignment
-
-We predict the **BAREC (Taha-19) readability level** for the processed essays.
-
----
-
-## 1. Readability Preprocessing (D3 Tokenization)
-
-**Script:**  
-`utils/essays_d3tok.py`
-
-**Input:**  
-`full_texts.tsv`
-
-**Functionality:**
-- Splits essays into sentences
-- Applies D3 tokenization
-- Computes word counts
-
-**Output:**  
-CSV file containing:
-- Essay text
-- D3-tokenized text
-- CEFR level
-- Word count
+1. [Installation](#installation)
+2. [Project Structure](#project-structure)
+3. [Data Sources](#data-sources)
+4. [Readability Alignment (BAREC)](#readability-alignment-barec)
+5. [Linguistic Profiling](#linguistic-profiling)
+6. [Profile Filtering](#profile-filtering)
+7. [Vocabulary List Construction](#vocabulary-list-construction)
+8. [Essay Generation (OpenAI Batch)](#essay-generation-openai-batch)
+9. [Evaluation Against Profiles](#evaluation-against-profiles)
+10. [Notes](#notes)
 
 ---
 
-## 2. Readability Prediction (BAREC Model)
+## Installation
 
-**Script:**  
-`utils/add_readability_levels.py`
+**Python**: 3.9+
 
-**Input:**  
-CSV file with D3 tokenization
+```bash
+pip install -r requirements.txt
+```
 
-**Output:**  
-CSV file with predicted BAREC (Taha-19) readability levels
+**CAMeL Tools** (required for morphological analysis and parsing):
 
----
+```bash
+pip install camel-tools
+camel_data -i morphology-db-msa-s31
+```
 
-## 3. Correlation Analysis
+> For CAMeL Parser, clone the repo separately and point `--model_dir` to its models directory:
+> ```bash
+> git clone https://github.com/CAMeL-Lab/camel_parser
+> ```
 
-We calculate the correlation between Taha-19 levels and CEFR levels.
+**OpenAI** (required for generation and vocab construction):
 
-**Script:**  
-`utils/barec_correlation.py`
+```bash
+export OPENAI_API_KEY=your_key_here
+```
 
----
+**CAMeL Morphology DB** (required for feature extraction):
 
-## 4. Visualization
-
-**Script:**  
-`utils/readability_visualization.py`
-
-**Input:**  
-CSV file containing CEFR and BAREC levels
-
-**Output:**  
-Heatmap visualization showing alignment between CEFR and BAREC levels
-
----
-
-# Profiling
-
-We create linguistic profiles for each CEFR level based on the processed data.
-
-Each profile consists of:
-- Syntactic features
-- Lexical features
-- Surface-level features
+```bash
+export CAMEL_MORPH_DB=path/to/camel_morph_msa_v1.0.db
+```
 
 ---
 
-## Syntactic Features
+## Project Structure
 
-### Preprocessing
-
-1. Sentence splitting  
-   `utils/split_sentences.py`
-
-2. Dependency parsing  
-   `feature_extraction/tree_parsing.py`
-
----
-
-### Feature Extraction
-
-1. POS tags, dependency relations, and Dep(POS) combinations  
-   Extracted using CamelParser  
-   `feature_extraction/syntactic_features.py`
-
-2. Tree depth statistics  
-   - `feature_extraction/tree_stats.py`  
-   - `feature_extraction/tree_stats_postprocess.py`
-
----
-
-## Lexical and Surface-Level Features
-
-1. Surface-level features  
-   `feature_extraction/surface_feats.py`
-
-2. Features requiring morphological disambiguation  
-   `feature_extraction/surface_disambig_features.py`
-
----
-
-# Profile Filtering
-
-We filter features based on their trends across CEFR levels to retain progression-sensitive and discriminative features.
-
-## 1. Profile Creation
-
-**Script:**  
-`profile_creator.py`
-
-**Input:**  
-Feature summaries from ZAEBUC and ARWI combined
-
-**Output:**  
-- Profiles of selected features  
-- Visualization plots located in:  
-  `profiling_data/ZAEBUC+ARWI/6levels`
+```
+.
+├── preprocessing/              # Dataset formatting utilities
+│   └── zaebuc_merge_correct_essays.py
+├── utils/                      # Readability, filtering, evaluation helpers
+│   ├── essays_d3tok.py
+│   ├── add_readability_levels.py
+│   ├── barec_correlation.py
+│   ├── readability_visualization.py
+│   ├── split_sentences.py
+│   ├── profile_creator.py
+│   ├── features_filter.py
+│   └── cosine_similarity.py
+├── feature_extraction/         # Syntactic and surface feature extraction
+│   ├── tree_parsing.py
+│   ├── tree_stats.py
+│   ├── tree_stats_postprocess.py
+│   ├── syntactic_features.py
+│   ├── surface_feats.py
+│   └── cefr_sentence_camel_features.py
+├── vocabulary_construction/    # Vocab list generation and filtering
+│   ├── generate_prompts_vocabs.py
+│   ├── gpt_tosamer.py
+│   ├── vocab_relevance.py
+│   └── merge_vocabs.py
+└── Generation/                 # OpenAI batch generation
+    ├── batch_creation.py
+    └── upload_run.py
+```
 
 ---
 
-# Vocabulary List Construction
+## Data Sources
 
-For each prompt, we construct a vocabulary list suitable for the target level.
+### ZAEBUC
 
-## 1. Generate vocabulary list per prompt  
-`vocabulary_construction/generate_prompts_vocabs.py`
+ZAEBUC corrected essays are provided **one token per row**. We merge them into full essays before running experiments.
 
-## 2. Map and filter generated words to their corresponding SAMER level  
-`vocabulary_construction/gpt_tosamer.py`
+```bash
+python preprocessing/zaebuc_merge_correct_essays.py \
+    --alignment_tsv <alignment_tsv> \
+    --analyzed_tsv <analyzed_tsv> \
+    --out_csv <out_csv>
+```
 
-## 3. For prompts with low vocabulary count, use a vocabulary relevance model to expand the list  
-`vocabulary_construction/vocab_relevance.py`
+Output CSV columns: `Document_ID`, `Essay`, `CEFR`, `word_count`
 
-## 4. Merge outputs from steps 2 and 3  
-`vocabulary_construction/merge_vocabs.py`
+### ARWI
 
----
-
-# Generation
-
-We prompt GPT-4o to generate essays using topics from the ARWI dataset.  
-The topics are categorized into:
-
-- Beginner
-- Intermediate
-- Advanced
-
-Prompts are structured with different level granularities:
-
-### 3 Levels
-- Beginner → A  
-- Intermediate → B  
-- Advanced → C  
-
-### 5 Levels
-- Beginner → A  
-- Intermediate → B1, B2  
-- Advanced → C1, C2  
-
-### 6 Levels
-- Beginner → A1, A2  
-- Intermediate → B1, B2  
-- Advanced → C1, C2  
-
-We use batch mode for generation.
-
-## 1. Batch creation  
-`Generation/batch_creation.py`
-
-## 2. Upload and run  
-`Generation/upload_run.py`
+ARWI essays are already formatted as full essays — no merging step needed.
+Expected input columns: `Document_ID`, `Essay`
 
 ---
 
-# Generation Conditions
+## Readability Alignment (BAREC)
 
-We generate essays under five conditions:
+We predict BAREC / Taha-19 readability levels for essays, then compute Spearman correlation
+with CEFR ordinal ranks to validate alignment.
 
-### P1
-Given topic only (no level specified).  
-Evaluation: 3 levels.
+### Step 1 — Sentence splitting + D3 tokenization
 
-### P2
-Given topic and level.  
-Evaluation: 6 levels.
+```bash
+python utils/essays_d3tok.py \
+  --input_csv <input_csv> \
+  --out_csv <out_csv> \
+  --preprocess_script <preprocess_script> \   # optional
+  --morph_db <morph_db>                       # optional
+```
 
-### P3
-Given topic, level, and profile specifications based on the level.  
-Evaluation: 6 levels.
+Output CSV columns: `Document_ID`, `Essay`, `d3tok`, `CEFR`, `word_count`
 
-### P4
-Given topic, level, and vocabulary list.  
-Evaluation: 5 levels.
+### Step 2 — Predict readability with BAREC
 
-### P5
-Given topic, level, profile specifications, and vocabulary list.  
-Evaluation: 5 levels.
+```bash
+python utils/add_readability_levels.py \
+  --input_csv <input_csv> \
+  --output_csv <output_csv>
+```
+
+### Step 3 — Spearman correlation (CEFR vs Taha-19)
+
+```bash
+python utils/barec_corelation.py \
+  --csvs paths/to/cefr_barec.csv
+```
+
+### Step 4 — Visualization
+
+```bash
+python utils/readability_visualization.py \
+  --input_csv <input_csv> \
+  --out_dir <out_dir> \
+  --drop_unassessable
+```
 
 ---
 
-# Post-Generation Processing
+## Linguistic Profiling
 
-After generation:
+We build per-CEFR-level linguistic profiles using **syntactic**, **lexical**, and **surface** features.
 
-1. We extract linguistic features (same pipeline as Feature Extraction section).
-2. We filter features based on the selected profile features:  
-   `utils/features_filter.py`
-3. We evaluate generated essays against CEFR profiles using cosine similarity:  
-   `utils/cosine_similarity.py`
+### Syntactic Features
+
+**1 — Split essays into sentences**
+
+```bash
+python utils/split_sentences.py \
+  --input_path <input_path> \
+  --sep "," \
+  --id_col Document_ID \
+  --text_col Essay \
+  --out_csv <out_csv>
+```
+
+**2 — Parse with CAMeL Parser (outputs CoNLL-X)**
+
+```bash
+python feature_extraction/tree_parsing.py \
+  --input_csv <input_csv> \
+  --batch_dir <batch_dir> \
+  --out_dir <out_dir>
+  # --model_dir and --clitic_feats_csv default to the local camel_parser paths
+```
+
+**3 — Compute tree statistics (depth, breadth, branching)**
+
+```bash
+python feature_extraction/tree_stats.py \
+  --src_dir <src_dir> \
+  --out_dir <out_dir>
+```
+
+to run:
+srun -p cscc-cpu-p -q cscc-cpu-qos --cpus-per-task 128 --mem=160G python feature_extraction/tree_stats.py \
+  --src_dir profiling_data/ARWI/batches/conllx \
+  --out_dir profiling_data/ARWI/batches/stats
+**4 — Aggregate per essay + optional heatmaps**
+
+```bash
+python feature_extraction/tree_stats_postprocess.py \
+  --stats_dir <stats_dir> \
+  --readability_csv <readability_csv> \
+  --out_csv <out_csv> \
+  --out_dir <out_dir> \
+  --make_heatmaps
+```
+
+to run
+srun -p cscc-cpu-p -q cscc-cpu-qos --cpus-per-task 128 --mem=160G python feature_extraction/tree_stats_postprocess.py \
+  --stats_dir profiling_data/ARWI/batches/stats \
+  --readability_csv profiling_data/ARWI/arwi_essays_readability.csv \
+  --out_csv profiling_data/ARWI/syntax/trees_stats.csv \
+  --out_dir profiling_data/ARWI/syntax \
+  --make_heatmaps
+
+
+**5 — POS / Dependency / Dep(POS) extraction**
+
+```bash
+python feature_extraction/syntactic_features.py \
+  --parsed_dir <parsed_dir> \
+  --readability_csv <readability_csv> \
+  --out_dir <out_dir>
+```
+to run
+srun -p cscc-cpu-p -q cscc-cpu-qos --cpus-per-task 128 --mem=160G python feature_extraction/syntactic_features.py \
+  --parsed_dir profiling_data/ARWI/batches/conllx \
+  --readability_csv profiling_data/ARWI/arwi_essays_readability.csv\
+  --out_dir profiling_data/ARWI/syntax
+
+
+put all conllx and run
+srun -p cscc-cpu-p -q cscc-cpu-qos --cpus-per-task 128 --mem=160G python feature_extraction/syntactic_features.py \
+  --parsed_dir profiling_data/ZAEBUC+ARWI/conllx \
+  --readability_csv profiling_data/ZAEBUC+ARWI/aessays_readability.csv\
+  --out_dir profiling_data/ZAEBUC+ARWI/syntax
+
+  
+Output: `syntax_level_summary.csv` in `<out_dir>`
+
+---
+
+### Surface Features
+
+```bash
+python feature_extraction/surface_feats.py \
+  --input_csv <input_csv> \
+  --out_dir <out_dir> \
+  --levels_csv <levels_csv>   # optional: CSV with Document_ID, CEFR (if not in input)
+```
+
+Outputs written to `<out_dir>`: `sentence_level_metrics.csv`, `essay_level_summary.csv`,
+`surface_level_summary.csv`, `cefr_words_metrics_plot.png`, `cefr_sentence_word_metrics_plot.png`
+
+---
+
+### Lexical Features (CAMeL disambiguation)
+
+```bash
+export CAMEL_MORPH_DB=calima-msa-s31.db
+
+python feature_extraction/cefr_sentence_camel_features.py \
+  --input_csv <input_csv> \
+  --levels_csv <levels_csv> \
+  --out_dir <out_dir>
+```
+
+running
+python feature_extraction/cefr_sentence_camel_features.py \
+  --input_csv profiling_data/ZAEBUC+ARWI/6levels/sentences.csv \
+  --levels_csv profiling_data/ZAEBUC+ARWI/6levels/esssays_readability.csv \
+  --out_dir profiling_data/ZAEBUC+ARWI/6levels/surface
+
+
+---
+
+## Profile Filtering
+
+We keep only **progression-sensitive** features — those that increase
+monotonically across CEFR levels (A1 → C2).
+
+### Step 1 — Select monotonic features
+
+Takes the three feature summary CSVs and outputs a single filtered feature list:
+
+```bash
+python utils/profile_creator.py \
+  --surface_csv <surface_csv> \
+  --camel_csv <camel_csv> \
+  --syntax_csv <syntax_csv> \
+  --trend increasing \
+  --out_csv <out_csv>
+```
+
+### Step 2 — Filter feature tables to selected set
+
+```bash
+python utils/features_filter.py \
+  --selected_features_csv <selected_features_csv> \
+  --surface_csv <surface_csv> \
+  --camel_csv <camel_csv> \
+  --syntax_csv <syntax_csv> \
+  --out_csv <out_csv>
+```
+
+The output serves as the **reference profile** for evaluation.
+
+---
+
+## Vocabulary List Construction
+
+### Step 1 — Generate candidate vocab per prompt (GPT)
+
+```bash
+export OPENAI_API_KEY=your_key_here
+
+python vocabulary_construction/generate_prompts_vocabs.py \
+  --input_csv <input_csv> \
+  --out_jsonl <out_jsonl> \
+  --out_csv <out_csv>
+```
+
+### Step 2 — Filter vocab using SAMER readability lexicon
+
+```bash
+python vocabulary_construction/gpt_tosamer.py \
+  --input_csv <input_csv> \
+  --samer_tsv <samer_tsv> \
+  --out_csv <out_csv>
+```
+
+### Step 3 — Expand low-count lists using relevance model (optional)
+
+```bash
+python vocabulary_construction/vocab_relevance.py \
+  --topic "<topic text>" \
+  --lexicon_tsv <lexicon_tsv> \
+  --level <level> \
+  --top_k <top_k> \
+  --out_csv <out_csv>
+```
+
+### Step 4 — Merge vocab sources
+
+```bash
+python vocabulary_construction/merge_vocabs.py \
+  --gpt_csv <gpt_csv> \
+  --relevant_csv <relevant_csv> \
+  --out_csv <out_csv>
+```
+
+---
+
+## Essay Generation (OpenAI Batch)
+
+Essays are generated under 5 prompting conditions:
+
+| ID | Description |
+|----|-------------|
+| P1 | Topic only (unconstrained baseline) |
+| P2 | Topic + CEFR level |
+| P3 | Topic + CEFR level + linguistic profile specs |
+| P4 | Topic + CEFR level + vocabulary list |
+| P5 | Topic + CEFR level + profile specs + vocabulary list |
+
+### Step 1 — Create batch input
+
+```bash
+python Generation/batch_creation.py \
+  --input_csv <input_csv> \
+  --out_jsonl <out_jsonl> \
+  --condition P3
+```
+
+### Step 2 — Upload and run batch
+
+```bash
+export OPENAI_API_KEY=your_key_here
+
+python Generation/upload_run.py \
+  --batch_input <batch_input_jsonl> \
+  --out_tsv <out_tsv>
+```
+
+---
+
+## Evaluation Against Profiles
+
+After generation, run the same feature extraction steps on the generated essays
+(Steps 1–5 of [Linguistic Profiling](#linguistic-profiling)), then filter to the
+selected feature set and evaluate:
+
+```bash
+python utils/cosine_similarity.py \
+  --reference_features_csv <reference_features_csv> \
+  --system_features_csv <system_features_csv> \
+  --out_dir <out_dir> \
+  --include_readability
+```

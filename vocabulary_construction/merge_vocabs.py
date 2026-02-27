@@ -1,117 +1,100 @@
-# merging the gpt and vocab relevance results
+"""Merge two vocabulary sources (e.g., GPT vocab + relevance-expanded vocab).
 
-import re, ast
-import pandas as pd
+Both inputs should have at least:
+  - prompt_id
+  - CEFR_level
+  - words (JSON-list string or comma-separated)
 
-gpt_vocab_path = '/home/nour.rabih/arwi/vocab/lowvocab_gpt_vocab_responses_filtered_by_samer_5levels_withpos_gloss.csv'
-relevant_vocab_path = '/home/nour.rabih/arwi/vocab/relevant_words_samer.csv'
+Output:
+  - merged word list per prompt_id (union)
 
-prompt_vocabs = pd.read_csv(gpt_vocab_path)
-relevant_vocabs = pd.read_csv(relevant_vocab_path)
+Example:
+  python vocabulary_construction/merge_vocabs.py \
+    --gpt_csv vocab/full_vocab_filtered_by_samer.csv \
+    --relevant_csv vocab/relevant_words.csv \
+    --out_csv vocab/merged_vocabs.csv
+"""
 
-_nan_token = re.compile(r'(?<![\w])nan(?![\w])', flags=re.IGNORECASE)
+from __future__ import annotations
 
-def parse_words_cell(s):
-    s = str(s).strip()
-    # Replace bare nan with None so it's a valid Python literal
-    s = _nan_token.sub("None", s)
-    return ast.literal_eval(s)
-
-prompt_vocabs["words"] = prompt_vocabs["words"].apply(parse_words_cell)
-
-# (<3 words)
-short_prompts = prompt_vocabs[prompt_vocabs["words"].apply(len) < 3].copy()
-print(f"Short prompts (<3 words): {len(short_prompts)}")
-# merge relevant vocabs only for short prompts
-merged_df = relevant_vocabs.merge(short_prompts, on=["prompt_id", "Level"], how="inner")
-print(f"Merged short prompts with relevant vocabs: {len(merged_df)}")
-# anti-join: keep rows from prompt_vocabs that are NOT in short_prompts by (prompt_id, Level)
-keys = ["prompt_id", "Level"]
-long_prompts = (
-    prompt_vocabs.merge(short_prompts[keys].drop_duplicates(), on=keys, how="left", indicator=True)
-               .query("_merge == 'left_only'")
-               .drop(columns=["_merge"])
-)
-print(f"Long prompts (>=3 words): {len(long_prompts)}")
-# align columns before concat (optional but recommended)
-# This keeps all columns from both; adjust if you want a specific schema.
-final_df = pd.concat([merged_df, long_prompts], ignore_index=True, sort=False)
-
-final_df.to_csv("relevance_gpt_lowvocab.csv", index=False)
-
-
+import argparse
 import ast
+import json
+from typing import List, Set
+
 import pandas as pd
 
-# --- paths (edit if needed) ---
-base_path = "gpt_vocab_responses_filtered_by_samer_5levels_withpos_gloss.csv"   # 322 rows
-other_path = "relevance_gpt_lowvocab.csv"
-out_path = "merged_common_words_322rows.csv"
 
-KEYS = ["prompt_id", "topic_id", "CEFR_level"]
+def _parse_words(x) -> List[str]:
+    if x is None:
+        return []
+    s = str(x).strip()
+    if not s:
+        return []
+    try:
+        v = json.loads(s)
+        if isinstance(v, list):
+            return [str(w).strip() for w in v if str(w).strip()]
+    except Exception:
+        pass
+    try:
+        v = ast.literal_eval(s)
+        if isinstance(v, list):
+            return [str(w).strip() for w in v if str(w).strip()]
+    except Exception:
+        pass
+    return [w.strip() for w in s.split(",") if w.strip()]
 
 
+def main(args):
+    gpt = pd.read_csv(args.gpt_csv)
+    rel = pd.read_csv(args.relevant_csv)
 
-def merge_preserve_order(a, b):
-    """
-    Merge two lists (often list of tuples), preserving order:
-    keep items from a first, then add unseen items from b.
-    Uniqueness is checked by the full element value.
-    """
-    out = []
-    seen = set()
-    for item in a:
-        if item not in seen:
-            out.append(item)
-            seen.add(item)
-    for item in b:
-        if item not in seen:
-            out.append(item)
-            seen.add(item)
-    return out
+    for df, name in [(gpt, "gpt"), (rel, "relevant")]:
+        for col in [args.prompt_id_col, args.cefr_col, args.words_col]:
+            if col not in df.columns:
+                raise ValueError(f"{name} CSV missing '{col}'. Found: {list(df.columns)}")
 
-# --- load ---
-base = pd.read_csv(base_path)
-other = pd.read_csv(other_path)
+    merged_rows = []
+    all_ids = sorted(set(gpt[args.prompt_id_col].astype(str)) | set(rel[args.prompt_id_col].astype(str)))
 
-# --- parse words columns (adjust column name if yours differs) ---
-if "words" not in base.columns:
-    raise ValueError("Base file must contain a 'words' column.")
-if "words" not in other.columns:
-    raise ValueError("Other file must contain a 'words' column.")
+    gpt_map = {str(r[args.prompt_id_col]): r for _, r in gpt.iterrows()}
+    rel_map = {str(r[args.prompt_id_col]): r for _, r in rel.iterrows()}
 
-base["words"] = base["words"].apply(parse_words_cell)
-other["words"] = other["words"].apply(parse_words_cell)
+    for pid in all_ids:
+        g = gpt_map.get(pid)
+        r = rel_map.get(pid)
 
-# --- keep only the keys + words from the other file for a clean merge ---
-other_small = other[KEYS + ["words"]].rename(columns={"words": "words_lowvocab"})
+        cefr = None
+        if g is not None:
+            cefr = g[args.cefr_col]
+        elif r is not None:
+            cefr = r[args.cefr_col]
 
-# --- left merge so we keep all 322 rows from base ---
-merged = base.merge(other_small, on=KEYS, how="left")
+        words: Set[str] = set()
+        if g is not None:
+            words.update(_parse_words(g[args.words_col]))
+        if r is not None:
+            words.update(_parse_words(r[args.words_col]))
 
-# --- optional: keep originals for auditing ---
-merged["words_original"] = merged["words"]
+        merged_rows.append({
+            "prompt_id": pid,
+            "CEFR_level": str(cefr) if cefr is not None else "",
+            "words": json.dumps(sorted(words), ensure_ascii=False),
+            "n_words": len(words),
+        })
 
-# --- merge words only when there's a match ---
-def merge_row(row):
-    a = row["words_original"]
-    b = row["words_lowvocab"]
-    if isinstance(b, list) and len(b) > 0:
-        return merge_preserve_order(a, b)
-    return a
+    out = pd.DataFrame(merged_rows)
+    out.to_csv(args.out_csv, index=False, encoding="utf-8")
+    print(f"Saved: {args.out_csv}")
 
-merged["words"] = merged.apply(merge_row, axis=1)
 
-# --- make sure words columns are saved as strings (literal list) in CSV ---
-for col in ["words", "words_original", "words_lowvocab"]:
-    if col in merged.columns:
-        merged[col] = merged[col].apply(lambda x: str(x) if isinstance(x, list) else ("" if pd.isna(x) else str(x)))
-
-# --- save ---
-merged.to_csv(out_path, index=False)
-
-# --- quick sanity prints ---
-print("Base rows:", len(base))
-print("Output rows:", len(merged))
-print("Matches on keys:", merged["words_lowvocab"].astype(str).ne("").sum())
-print("Saved:", out_path)
+if __name__ == "__main__":
+    ap = argparse.ArgumentParser(description="Merge two vocab sources into a union per prompt.")
+    ap.add_argument("--gpt_csv", required=True)
+    ap.add_argument("--relevant_csv", required=True)
+    ap.add_argument("--out_csv", required=True)
+    ap.add_argument("--prompt_id_col", default="prompt_id")
+    ap.add_argument("--cefr_col", default="CEFR_level")
+    ap.add_argument("--words_col", default="words")
+    main(ap.parse_args())

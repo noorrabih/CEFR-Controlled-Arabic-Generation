@@ -1,62 +1,66 @@
-# Script to read a TSV file with documents and their corrected text,
-# split the corrected text into sentences, and output a CSV file with each sentence
+"""Split essays into sentences.
 
-import pandas as pd
+Reads a TSV/CSV file with document IDs and essay text, and produces a CSV where each row
+is a sentence with columns: ID, Document_ID, Sentence.
+
+Example:
+  python utils/split_sentences.py \
+    --input_path generated_essays.tsv --sep '\t' \
+    --id_col Document_ID --text_col essay \
+    --out_csv generated_essays_sentences.csv
+"""
+
+from __future__ import annotations
+
+import argparse
 import re
-from pathlib import Path
+import pandas as pd
 
-in_path = Path("/home/nour.rabih/arwi/readability_controlled_generation/generation/syntax_vocab_prompt/5levels/generated_essays_5levels.tsv")
-out_path = Path("/home/nour.rabih/arwi/readability_controlled_generation/generation/syntax_vocab_prompt/5levels/generated_essays_sentences.csv")
 
-df = pd.read_csv(in_path, sep="\t", dtype=str, keep_default_na=False)
-
-id_col = "Document_ID"  # column with document IDs
-essay_col = "essay"     # column with corrected essay text
-
-if id_col not in df.columns:
-    id_col = "ID"
-
-if essay_col not in df.columns:
-    essay_col = "text"
-
-# Ensure columns
-for col in [id_col, essay_col]:
-    if col not in df.columns:
-        raise RuntimeError(f"Missing required column: {col}")
-
-# Sentence splitter
 sent_end_pattern = re.compile(r"(?<=[\.\!\?؟؛…])\s+")
-def split_sentences(t: str):
-    if not isinstance(t, str):
+
+
+def split_sentences(text: str):
+    if not isinstance(text, str):
         return []
-    t = t.strip()
+    t = text.strip()
     if not t:
         return []
     t = re.sub(r"[ \t]+", " ", t)
     parts = sent_end_pattern.split(t)
     sents = [p.strip() for p in parts if p and p.strip()]
-    if not sents:
-        sents = [t]
-    return sents
+    return sents if sents else [t]
 
-# Base extractor: choose the LONGEST numeric group; if tie, take the last occurrence
-def extract_base(doc: str):
-    nums = re.findall(r"\d+", str(doc))
-    if not nums:
-        return str(doc).strip()
-    maxlen = max(len(x) for x in nums)
-    candidates = [x for x in nums if len(x) == maxlen]
-    return candidates[-1]
 
-rows = []
-for _, r in df.iterrows():
-    base = r[id_col]  # e.g., 268469
-    anon_id = base
-    sents = split_sentences(r[essay_col])
-    for n, s in enumerate(sents, start=1):
-        rows.append({"ID": f"{base}-{n}", "anon_id": anon_id, "Sentence": s})
+def main(args):
+    df = pd.read_csv(args.input_path, sep=args.sep, dtype=str, keep_default_na=False)
 
-out_df = pd.DataFrame(rows, columns=["ID", "anon_id", "Sentence"])
-out_df.to_csv(out_path, index=False)
+    id_col = args.id_col
+    text_col = args.text_col
 
-print(f"Wrote: {out_path}")
+    if id_col not in df.columns:
+        raise ValueError(f"Missing id_col '{id_col}'. Found: {list(df.columns)}")
+    if text_col not in df.columns:
+        raise ValueError(f"Missing text_col '{text_col}'. Found: {list(df.columns)}")
+
+    rows = []
+    for _, r in df.iterrows():
+        base = str(r[id_col]).strip()
+        anon_id = base
+        sents = split_sentences(r[text_col])
+        for n, s in enumerate(sents, start=1):
+            rows.append({"ID": f"{base}-{n}", "Document_ID": anon_id, "Sentence": s})
+
+    out_df = pd.DataFrame(rows, columns=["ID", "Document_ID", "Sentence"])
+    out_df.to_csv(args.out_csv, index=False)
+    print(f"Wrote: {args.out_csv}")
+
+
+if __name__ == "__main__":
+    ap = argparse.ArgumentParser(description="Split essays into sentences.")
+    ap.add_argument("--input_path", required=True)
+    ap.add_argument("--sep", default="\t", help="Input separator (default: tab).")
+    ap.add_argument("--id_col", default="Document_ID")
+    ap.add_argument("--text_col", default="essay")
+    ap.add_argument("--out_csv", required=True)
+    main(ap.parse_args())

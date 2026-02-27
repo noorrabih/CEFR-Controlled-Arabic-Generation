@@ -101,7 +101,6 @@ def make_disambiguator(bert):
 def sentence_camel_features(sentence: str, disambiguate_fn) -> Dict[str, float]:
     """
     Returns:
-      - total_syllables
       - avg_syllables_per_word
       - unique_lemmas
       - unique_lemma_pos
@@ -166,7 +165,7 @@ def main(
     levels_csv:str,
     output_sentence_csv: str = "sentence_features_camel.csv",
     output_group_csv: str = "group_features_camel.csv",
-    db_path: str = "/home/nour.rabih/Readability-morph/camel_morph_msa_v1.0.db",
+    db_path: str | None = None,
 ):
     df = pd.read_csv(input_csv)
     levels = pd.read_csv(levels_csv)
@@ -205,22 +204,7 @@ def main(
     group_df.to_csv(output_group_csv, index=False, encoding="utf-8-sig")
     print(f"Saved: {output_group_csv}")
 
-    # zaebuc = pd.read_csv("/home/nour.rabih/arwi/readability_controlled_generation/ZAEBUC-v1.01/surface_feats/group_features_camel.csv")
-    # AR-030-268469
-    # zaebuc['anon_id'] = zaebuc['anon_id'].str.split('-').str[-1]
-    # print(zaebuc["anon_id"].head())
-    # bea = pd.read_csv("/home/nour.rabih/arwi/readability_controlled_generation/arabic-aes-bea25/Data/surface_feats/group_features_camel.csv")
-    # #AR_gpt-4o_10_130_2581
-    # df = pd.concat([bea, zaebuc], ignore_index=True)
-    # df.to_csv(output_group_csv, index=False, encoding="utf-8-sig")
-    # bea_levels = pd.read_csv("/home/nour.rabih/arwi/readability_controlled_generation/arabic-aes-bea25/Data/arwi_cefr_levels.csv")
-    # AR_gpt-4o_1_1_1
-    # zaebuc_levels = pd.read_csv("/home/nour.rabih/arwi/readability_controlled_generation/ZAEBUC-v1.01/corrected_essays_readability.csv")
-    # 268469
-    # levels = pd.concat([bea_levels, zaebuc_levels], ignore_index=True)
-    # df = pd.read_csv(output_group_csv)
     df = group_df
-    # df = pd.read_csv(output_group_csv)
     # Extract CEFR
     if "CEFR" not in df.columns:
         df["CEFR"] = df["anon_id"].str.split("_").str[1]
@@ -234,15 +218,12 @@ def main(
     print(df["CEFR"].value_counts())
     if df["CEFR"].nunique() < 2:
         print("Warning: Some CEFR levels could not be extracted.")
-        # /home/nour.rabih/arwi/readability_controlled_generation/arabic-aes-bea25/Data/arwi_cefr_levels.csv
         # cefr level mapping file
-        # levels = pd.read_csv("/home/nour.rabih/arwi/readability_controlled_generation/arabic-aes-bea25/Data/arwi_cefr_levels.csv")
         levels["essay_id"] = levels["ID"].astype(str)
         cefr_dict = dict(zip(levels["ID"], levels["CEFR"]))
         def get_cefr_from_dict(group_id):
             # group_id = group_id.split("-")[2]
             return cefr_dict.get(group_id, "NA")
-        import pdb; pdb.set_trace()
         df["CEFR"] = df["anon_id"].apply(get_cefr_from_dict)
         df = df[df["CEFR"] != "Unassessable"]
 
@@ -277,12 +258,19 @@ def main(
     plt.tight_layout()
     plt.savefig(f"{output_group_csv.replace('.csv', '')}_plot.png")
 
-
 if __name__ == "__main__":
-    directory = "/home/nour.rabih/arwi/readability_controlled_generation/generation/vocabs_prompt/5levels/surface_feats/"
+    import argparse, os
+    ap = argparse.ArgumentParser(description="Extract CAMeL-based sentence/group features (syllables, lemmas, etc.).")
+    ap.add_argument("--input_csv", required=True, help="CSV with at least columns: ID, Sentence, anon_id")
+    ap.add_argument("--levels_csv", default=None, help="Optional CSV to map IDs to CEFR if CEFR cannot be extracted from anon_id")
+    ap.add_argument("--out_dir", required=True)
+    ap.add_argument("--db_path", default=os.environ.get("CAMEL_MORPH_DB"), help="Path to camel morphology DB. Can also be set via CAMEL_MORPH_DB env var.")
+    args = ap.parse_args()
+    os.makedirs(args.out_dir, exist_ok=True)
     main(
-        input_csv="/home/nour.rabih/arwi/readability_controlled_generation/generation/vocabs_prompt/5levels/generated_essays_p3_sentences.csv",
-        levels_csv="/home/nour.rabih/arwi/readability_controlled_generation/generation/vocabs_prompt/5levels/generated_essays_p3_readability.csv",
-        output_sentence_csv=f"{directory}sentence_features_camel.csv",
-        output_group_csv=f"{directory}group_features_camel.csv",
+        input_csv=args.input_csv,
+        levels_csv=args.levels_csv or args.input_csv,
+        output_sentence_csv=os.path.join(args.out_dir, "sentence_features_camel.csv"),
+        output_group_csv=os.path.join(args.out_dir, "group_features_camel.csv"),
+        db_path=args.db_path,
     )

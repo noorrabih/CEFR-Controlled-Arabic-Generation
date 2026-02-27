@@ -1,71 +1,65 @@
-# open /home/nour.rabih/arwi/readability_controlled_generation/zaebuc+bea/selected_features_graphs/selected_readability_monotonic_features.csv
+"""Merge CEFR levels (e.g., 6-level -> 5-level or 3-level buckets).
 
-# for levels A1 and A2, add both to a new row call it A, and add the average of the two values in the new row
+This is used when you want to evaluate / profile at coarser granularity.
 
+Example:
+  python utils/level_merging.py --input_csv level_summary_6levels.csv --scheme 5 --out_csv level_summary_5levels.csv
+
+Schemes:
+- 5:  A1+A2 -> A, keep B1,B2,C1,C2
+- 3:  A1+A2 -> A, B1+B2 -> B, C1+C2 -> C
+"""
+
+from __future__ import annotations
+
+import argparse
 import pandas as pd
 
-# read the csv file
-df = pd.read_csv('/home/nour.rabih/arwi/readability_controlled_generation/zaebuc+bea/selected_features_graphs/selected_readability_monotonic_features.csv')
-# create a new row for A by averaging A1 and A2
-print(df)
-# compute the average of A1 and A2
-merged_A1_A2 = (
-    df[df["level"].isin(["A1", "A2"])]
-    .mean(numeric_only=True)
-    .to_frame()
-    .T
-)
 
-# assign the new level name
-merged_A1_A2["level"] = "A"
-merged_A1_A2["CEFR"] = "A"
+def merge_levels(df: pd.DataFrame, scheme: int, level_col: str = "CEFR") -> pd.DataFrame:
+    if level_col not in df.columns:
+        raise ValueError(f"Missing level_col '{level_col}'. Found: {list(df.columns)}")
 
-# remove original A1 and A2 rows
-df = df[~df["level"].isin(["A1", "A2"])]
+    mapping = {}
+    if scheme == 5:
+        mapping = {"A1": "A", "A2": "A", "B1": "B1", "B2": "B2", "C1": "C1", "C2": "C2", "A": "A"}
+    elif scheme == 3:
+        mapping = {"A1": "A", "A2": "A", "B1": "B", "B2": "B", "C1": "C", "C2": "C", "A": "A", "B": "B", "C": "C"}
+    else:
+        raise ValueError("scheme must be 3 or 5")
 
-# append the merged row
-df = pd.concat([df, merged_A1_A2], ignore_index=True)
+    out = df.copy()
+    out[level_col] = out[level_col].map(mapping).fillna(out[level_col])
 
-print(df)
+    # Average numeric columns after merging
+    numeric_cols = out.select_dtypes(include='number').columns.tolist()
+    other_cols = [c for c in out.columns if c not in numeric_cols and c != level_col]
+
+    agg = {c: 'first' for c in other_cols}
+    for c in numeric_cols:
+        agg[c] = 'mean'
+
+    out = out.groupby(level_col, as_index=False).agg(agg)
+
+    # Sort
+    order = ["A", "B1", "B2", "C1", "C2"] if scheme == 5 else ["A", "B", "C"]
+    out[level_col] = pd.Categorical(out[level_col], categories=order, ordered=True)
+    out = out.sort_values(level_col).reset_index(drop=True)
+
+    return out
 
 
-# save the new csv file
-df.to_csv('/home/nour.rabih/arwi/readability_controlled_generation/zaebuc+bea/selected_features_graphs/5levels/selected_readability_monotonic_features.csv', index=False)
+def main(args):
+    df = pd.read_csv(args.input_csv)
+    out = merge_levels(df, scheme=args.scheme, level_col=args.level_col)
+    out.to_csv(args.out_csv, index=False)
+    print(f"Saved: {args.out_csv}")
 
-# now B1 and B2
-# compute the average of B1 and B2
-merged_B1_B2 = (
-    df[df["level"].isin(["B1", "B2"])]
-    .mean(numeric_only=True)
-    .to_frame()
-    .T
-)
-# assign the new level name
-merged_B1_B2["level"] = "B"
-merged_B1_B2["CEFR"] = "B"
-# remove original B1 and B2 rows
-df = df[~df["level"].isin(["B1", "B2"])]
-# append the merged row
-df = pd.concat([df, merged_B1_B2], ignore_index=True)
-print(df)
 
-# now C
-
-# compute the average of C1 and C2
-merged_C1_C2 = (
-    df[df["level"].isin(["C1", "C2"])]
-    .mean(numeric_only=True)
-    .to_frame()
-    .T
-)
-# assign the new level name
-merged_C1_C2["level"] = "C"
-merged_C1_C2["CEFR"] = "C"
-# remove original C1 and C2 rows
-df = df[~df["level"].isin(["C1", "C2"])]
-# append the merged row
-df = pd.concat([df, merged_C1_C2], ignore_index=True)
-print(df)
-
-# save the new csv file
-df.to_csv('/home/nour.rabih/arwi/readability_controlled_generation/zaebuc+bea/selected_features_graphs/3levels/selected_readability_monotonic_features.csv', index=False)
+if __name__ == "__main__":
+    ap = argparse.ArgumentParser(description="Merge CEFR levels into coarser buckets.")
+    ap.add_argument("--input_csv", required=True)
+    ap.add_argument("--scheme", type=int, choices=[3,5], required=True)
+    ap.add_argument("--level_col", default="CEFR")
+    ap.add_argument("--out_csv", required=True)
+    main(ap.parse_args())
