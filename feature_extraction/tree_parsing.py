@@ -137,8 +137,8 @@ if __name__ == "__main__":
     ap.add_argument("--out_dir", required=True)
     ap.add_argument("--batch_size", type=int, default=100)
 
-    ap.add_argument("--model_dir", default="/home/nour.rabih/Readability-morph/camel_parser/models", help="Path to camel_parser/models directory")
-    ap.add_argument("--clitic_feats_csv", default="/home/nour.rabih/camel_parser/data/clitic_feats.csv", help="Path to camel_parser/data/clitic_feats.csv")
+    ap.add_argument("--model_dir", required=True, help="Path to camel_parser/models directory")
+    ap.add_argument("--clitic_feats_csv", required=True, help="Path to camel_parser/data/clitic_feats.csv")
     ap.add_argument("--parse_model", default="catib")
     ap.add_argument("--model_name", default="CAMeLBERT-CATiB-biaffine.model")
 

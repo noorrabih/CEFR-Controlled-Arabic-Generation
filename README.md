@@ -81,14 +81,14 @@ export CAMEL_MORPH_DB=path/to/camel_morph_msa_v1.0.db
 │   ├── tree_stats_postprocess.py
 │   ├── syntactic_features.py
 │   ├── surface_feats.py
-│   └── cefr_sentence_camel_features.py
+│   └── camel_features.py
 ├── vocabulary_construction/    # Vocab list generation and filtering
 │   ├── generate_prompts_vocabs.py
 │   ├── gpt_tosamer.py
 │   ├── vocab_relevance.py
 │   └── merge_vocabs.py
-└── Generation/                 # OpenAI batch generation
-    ├── batch_creation.py
+└── generation/                 # OpenAI batch generation
+    ├── build_batch.py
     └── upload_run.py
 ```
 
@@ -112,7 +112,7 @@ Output CSV columns: `Document_ID`, `Essay`, `CEFR`, `word_count`
 ### ARWI
 
 ARWI essays are already formatted as full essays — no merging step needed.
-Expected input columns: `Document_ID`, `Essay`
+Expected input columns: `Document_ID`, `Essay`, `CEFR`
 
 ---
 
@@ -156,7 +156,7 @@ python utils/readability_visualization.py \
   --out_dir <out_dir> \
   --drop_unassessable
 ```
-
+ 
 ---
 
 ## Linguistic Profiling
@@ -193,11 +193,6 @@ python feature_extraction/tree_stats.py \
   --src_dir <src_dir> \
   --out_dir <out_dir>
 ```
-
-to run:
-srun -p cscc-cpu-p -q cscc-cpu-qos --cpus-per-task 128 --mem=160G python feature_extraction/tree_stats.py \
-  --src_dir profiling_data/ARWI/batches/conllx \
-  --out_dir profiling_data/ARWI/batches/stats
 **4 — Aggregate per essay + optional heatmaps**
 
 ```bash
@@ -209,15 +204,6 @@ python feature_extraction/tree_stats_postprocess.py \
   --make_heatmaps
 ```
 
-to run
-srun -p cscc-cpu-p -q cscc-cpu-qos --cpus-per-task 128 --mem=160G python feature_extraction/tree_stats_postprocess.py \
-  --stats_dir profiling_data/ARWI/batches/stats \
-  --readability_csv profiling_data/ARWI/arwi_essays_readability.csv \
-  --out_csv profiling_data/ARWI/syntax/trees_stats.csv \
-  --out_dir profiling_data/ARWI/syntax \
-  --make_heatmaps
-
-
 **5 — POS / Dependency / Dep(POS) extraction**
 
 ```bash
@@ -226,20 +212,7 @@ python feature_extraction/syntactic_features.py \
   --readability_csv <readability_csv> \
   --out_dir <out_dir>
 ```
-to run
-srun -p cscc-cpu-p -q cscc-cpu-qos --cpus-per-task 128 --mem=160G python feature_extraction/syntactic_features.py \
-  --parsed_dir profiling_data/ARWI/batches/conllx \
-  --readability_csv profiling_data/ARWI/arwi_essays_readability.csv\
-  --out_dir profiling_data/ARWI/syntax
 
-
-put all conllx and run
-srun -p cscc-cpu-p -q cscc-cpu-qos --cpus-per-task 128 --mem=160G python feature_extraction/syntactic_features.py \
-  --parsed_dir profiling_data/ZAEBUC+ARWI/conllx \
-  --readability_csv profiling_data/ZAEBUC+ARWI/aessays_readability.csv\
-  --out_dir profiling_data/ZAEBUC+ARWI/syntax
-
-  
 Output: `syntax_level_summary.csv` in `<out_dir>`
 
 ---
@@ -269,12 +242,14 @@ python feature_extraction/cefr_sentence_camel_features.py \
   --out_dir <out_dir>
 ```
 
-running
-python feature_extraction/cefr_sentence_camel_features.py \
-  --input_csv profiling_data/ZAEBUC+ARWI/6levels/sentences.csv \
-  --levels_csv profiling_data/ZAEBUC+ARWI/6levels/esssays_readability.csv \
-  --out_dir profiling_data/ZAEBUC+ARWI/6levels/surface
+To skip CAMeL processing and reuse an existing sentence features CSV (e.g. to redo only essay/level aggregation):
 
+```bash
+python feature_extraction/cefr_sentence_camel_features.py \
+  --sentence_csv <existing_sentence_features_camel.csv> \
+  --levels_csv <levels_csv> \
+  --out_dir <out_dir>
+```
 
 ---
 
@@ -283,7 +258,7 @@ python feature_extraction/cefr_sentence_camel_features.py \
 We keep only **progression-sensitive** features — those that increase
 monotonically across CEFR levels (A1 → C2).
 
-### Step 1 — Select monotonic features
+### Select monotonic features
 
 Takes the three feature summary CSVs and outputs a single filtered feature list:
 
@@ -296,20 +271,7 @@ python utils/profile_creator.py \
   --out_csv <out_csv>
 ```
 
-### Step 2 — Filter feature tables to selected set
-
-```bash
-python utils/features_filter.py \
-  --selected_features_csv <selected_features_csv> \
-  --surface_csv <surface_csv> \
-  --camel_csv <camel_csv> \
-  --syntax_csv <syntax_csv> \
-  --out_csv <out_csv>
-```
-
 The output serves as the **reference profile** for evaluation.
-
----
 
 ## Vocabulary List Construction
 
@@ -319,29 +281,40 @@ The output serves as the **reference profile** for evaluation.
 export OPENAI_API_KEY=your_key_here
 
 python vocabulary_construction/generate_prompts_vocabs.py \
-  --input_csv <input_csv> \
+  --input_csv <input_csv> \ # prompt with their level
   --out_jsonl <out_jsonl> \
   --out_csv <out_csv>
 ```
 
 ### Step 2 — Filter vocab using SAMER readability lexicon
-
 ```bash
 python vocabulary_construction/gpt_tosamer.py \
-  --input_csv <input_csv> \
+  --input_jsonl <input_jsonl> \
   --samer_tsv <samer_tsv> \
-  --out_csv <out_csv>
+  --out_dir <out_dir> \
+  --levels 5   # or 3 or 5
 ```
 
-### Step 3 — Expand low-count lists using relevance model (optional)
+### Step 3 — Extract Low vocab prompts
+```bash
+python vocabulary_construction/low_vocabs.py \
+  --filtered_vocab_csv <filtered_vocab_csv> \
+  --prompts_csv <prompts_csv> \
+  --out_csv <out_csv> \
+  --min_words 4
+```
+
+### Step 4 — Expand low-count lists using relevance model (optional)
 
 ```bash
 python vocabulary_construction/vocab_relevance.py \
-  --topic "<topic text>" \
-  --lexicon_tsv <lexicon_tsv> \
-  --level <level> \
-  --top_k <top_k> \
-  --out_csv <out_csv>
+  --prompts_csv <prompts_csv> \
+  --lexicon_path <lexicon_path> \
+  --out_csv <out_csv> \
+  --threshold 0.50 \
+  --fallback_threshold 0.35 \
+  --top_k 40 \
+  --device auto
 ```
 
 ### Step 4 — Merge vocab sources
@@ -369,23 +342,40 @@ Essays are generated under 5 prompting conditions:
 
 ### Step 1 — Create batch input
 
-```bash
-python Generation/batch_creation.py \
-  --input_csv <input_csv> \
-  --out_jsonl <out_jsonl> \
-  --condition P3
-```
+# P1 — no level, no vocab, no profile
+python generation/build_batch.py \
+  --prompts_csv <prompts_csv> --out_jsonl <out_jsonl> \
+  --prompt_version P1 --custom_id_suffix 6levels_p1
+
+# P2 — level only
+python generation/build_batch.py \
+  --prompts_csv <prompts_csv> --out_jsonl <out_jsonl> \
+  --prompt_version P2 --custom_id_suffix 6levels_p2
+
+# P3 — level + profile
+python generation/build_batch.py \
+  --prompts_csv <prompts_csv> --out_jsonl <out_jsonl> \
+  --prompt_version P3 --profile_csv <profile_csv> --custom_id_suffix 6levels_p3
+
+# P4 — level + vocab
+python generation/build_batch.py \
+  --prompts_csv <prompts_csv> --out_jsonl <out_jsonl> \
+  --prompt_version P4 --vocab_csv <vocab_csv> --custom_id_suffix 6levels_p4
+
+# P5 — level + profile + vocab
+python generation/build_batch.py \
+  --prompts_csv <prompts_csv> --out_jsonl <out_jsonl> \
+  --prompt_version P5 --profile_csv <profile_csv> --vocab_csv <vocab_csv> \
+  --custom_id_suffix 5levels_p5
 
 ### Step 2 — Upload and run batch
-
 ```bash
 export OPENAI_API_KEY=your_key_here
 
-python Generation/upload_run.py \
+python generation/upload_run.py \
   --batch_input <batch_input_jsonl> \
   --out_tsv <out_tsv>
 ```
-
 ---
 
 ## Evaluation Against Profiles
@@ -394,6 +384,18 @@ After generation, run the same feature extraction steps on the generated essays
 (Steps 1–5 of [Linguistic Profiling](#linguistic-profiling)), then filter to the
 selected feature set and evaluate:
 
+### Filter
+
+```bash
+python utils/features_filter.py \
+  --selected_features_csv <selected_features_csv> \ # profile
+  --surface_csv <surface_csv> \
+  --camel_csv <camel_csv> \
+  --syntax_csv <syntax_csv> \
+  --out_csv <out_csv>
+```
+
+### Evaluate
 ```bash
 python utils/cosine_similarity.py \
   --reference_features_csv <reference_features_csv> \

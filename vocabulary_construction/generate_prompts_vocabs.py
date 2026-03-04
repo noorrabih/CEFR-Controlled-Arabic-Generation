@@ -12,9 +12,9 @@ The script calls an OpenAI chat model and asks for a comma-separated list of Ara
 Example:
   export OPENAI_API_KEY=... 
   python vocabulary_construction/generate_prompts_vocabs.py \
-    --input_csv generation/prompts_with_levels.csv \
-    --out_jsonl vocab/full_vocab.jsonl \
-    --out_csv vocab/full_vocab.csv \
+    --input_csv generation_data/topic_prompts/prompts_with_6cefr_levels.csv \
+    --out_jsonl generation_data/vocabulary/6levels/full_vocab.jsonl \
+    --out_csv generation_data/vocabulary/6levels/full_vocab.csv \
     --model gpt-4o \
     --cefr_col CEFR_level \
     --arabic_col "Arabic Text"
